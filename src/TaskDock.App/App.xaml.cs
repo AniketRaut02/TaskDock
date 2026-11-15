@@ -24,6 +24,7 @@ public partial class App : Application
 
     Mutex? _single;
     HubServer? _hub;
+    HubOptions? _hubOptions;
     TaskbarIcon? _tray;
     MainWindow? _window;
     MainViewModel? _vm;
@@ -59,7 +60,7 @@ public partial class App : Application
 
         var events = Channel.CreateUnbounded<StateEvent>(new UnboundedChannelOptions { SingleReader = true });
         var broker = new ApprovalBroker();
-        _hub = new HubServer(new HubOptions
+        _hub = new HubServer(_hubOptions = new HubOptions
         {
             HoldWindow = TimeSpan.FromSeconds(_settings.HoldSeconds),
             Logging = l => l.AddSerilog(Log.Logger),
@@ -111,7 +112,7 @@ public partial class App : Application
         _window = new MainWindow(_vm, _settings);
         _vm.Sync();
         _window.Show();
-        _tray = BuildTray(notify);
+        _tray = BuildTray(notify, sounds);
         _vm.Hint += text => _tray.ShowNotification("TaskDock", text);
         await _vm.Media.StartAsync();
 
@@ -162,15 +163,30 @@ public partial class App : Application
 
     // ---------- tray ----------
 
-    GeneratedIconSource? _icon;
+    // Badges are drawn once and reused: regenerating one per change (GeneratedIconSource) leaked GDI objects
+    // until Windows' 10,000-per-process limit (found by the Phase 7 soak).
+    readonly Dictionary<string, System.Drawing.Icon> _badges = new();
+    string _badge = "";
 
-    TaskbarIcon BuildTray(NotifyEngine notify)
+    System.Drawing.Icon Badge(string text)
     {
-        _icon = new GeneratedIconSource
+        if (_badges.TryGetValue(text, out var icon)) return icon;
+        using var bmp = new System.Drawing.Bitmap(32, 32);
+        using (var g = System.Drawing.Graphics.FromImage(bmp))
+        using (var font = new System.Drawing.Font("Segoe UI", 17, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Pixel))
+        using (var fill = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(0x3E, 0x8E, 0xF7)))
         {
-            Text = "T", Foreground = Brushes.White, Background = new SolidColorBrush(Color.FromRgb(0x3E, 0x8E, 0xF7)),
-            FontWeight = FontWeights.Bold,
-        };
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+            g.FillEllipse(fill, 1, 1, 30, 30);
+            var centre = new System.Drawing.StringFormat { Alignment = System.Drawing.StringAlignment.Center, LineAlignment = System.Drawing.StringAlignment.Center };
+            g.DrawString(text, font, System.Drawing.Brushes.White, new System.Drawing.RectangleF(0, 1, 32, 32), centre);
+        }
+        return _badges[text] = System.Drawing.Icon.FromHandle(bmp.GetHicon()); // at most 10 ("T", 1–9), kept for the app's life
+    }
+
+    TaskbarIcon BuildTray(NotifyEngine notify, Sounds sounds)
+    {
         var menu = new ContextMenu();
         MenuItem Item(string header, Action click)
         {
@@ -224,23 +240,48 @@ public partial class App : Application
 
         var mute = new MenuItem { Header = "Mute sounds", IsCheckable = true, IsChecked = notify.Muted };
         mute.Click += (_, _) => { notify.Muted = _settings.Muted = mute.IsChecked; _settings.Save(); };
+        menu.Opened += (_, _) => mute.IsChecked = notify.Muted; // the settings window can change it too
         menu.Items.Add(mute);
+        menu.Items.Add(Item("Settings…", () => OpenSettings(notify, sounds)));
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("Quit", Quit));
 
-        var tray = new TaskbarIcon { ToolTipText = "TaskDock", IconSource = _icon, ContextMenu = menu };
+        var tray = new TaskbarIcon { ToolTipText = "TaskDock", Icon = Badge(_badge = "T"), ContextMenu = menu };
         tray.TrayLeftMouseUp += (_, _) => { _userHidden = !_userHidden; UpdateVisibility(); };
         tray.ForceCreate(false);
         return tray;
     }
 
+    void OpenSettings(NotifyEngine notify, Sounds sounds)
+    {
+        var w = new SettingsWindow(_settings);
+        if (w.ShowDialog() != true) return;
+        var e = w.Edited;
+        var holdChanged = e.HoldSeconds != _settings.HoldSeconds;
+        (_settings.Muted, _settings.Volume, _settings.QuietFrom, _settings.QuietTo) = (e.Muted, e.Volume, e.QuietFrom, e.QuietTo);
+        (_settings.SilentWhenFocused, _settings.HideWhenFullscreen, _settings.AutoSort) = (e.SilentWhenFocused, e.HideWhenFullscreen, e.AutoSort);
+        (_settings.HoldSeconds, _settings.TerminalTemplate) = (e.HoldSeconds, e.TerminalTemplate);
+        _settings.Save();
+
+        // Apply live; the rest is read from _settings where it's used.
+        notify.Muted = e.Muted;
+        notify.QuietFrom = TimeOnly.TryParse(e.QuietFrom, out var qf) ? qf : null;
+        notify.QuietTo = TimeOnly.TryParse(e.QuietTo, out var qt) ? qt : null;
+        sounds.Volume = e.Volume;
+        _vm!.AutoSort = e.AutoSort;
+        _vm.Sync();
+        _hubOptions!.HoldWindow = TimeSpan.FromSeconds(e.HoldSeconds);
+        // Installed hooks carry a timeout derived from the hold window: rewrite them to match.
+        if (holdChanged && ClaudeHooksInstaller.IsInstalled()) ClaudeHooksInstaller.Connect(_hub!.Port, _hub.Token, e.HoldSeconds);
+    }
+
     /// <summary>The tray icon shows how many detected sources are waiting to be pinned.</summary>
     void UpdateTrayBadge()
     {
-        if (_icon == null || _vm == null) return;
+        if (_tray == null || _vm == null) return;
         var text = _vm.DetectedCount > 0 ? Math.Min(_vm.DetectedCount, 9).ToString() : "T";
-        if (_icon.Text != text) _icon.Text = text;
-        if (_tray != null) _tray.ToolTipText = $"TaskDock · {_vm.PillText}";
+        if (text != _badge) _tray.Icon = Badge(_badge = text);
+        _tray.ToolTipText = $"TaskDock · {_vm.PillText}";
     }
 
     void ApplyPreset(string name, bool merge)

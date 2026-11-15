@@ -38,6 +38,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="b" Property="Opacity" Value="0.85"/></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="b" Property="Opacity" Value="0.3"/></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -49,6 +50,8 @@
             <Setter Property="Margin" Value="2,0,0,0"/>
             <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
             <Setter Property="Foreground" Value="#9EA1AA"/>
+            <!-- Glyph buttons have no readable text: use the tooltip as the accessible name. -->
+            <Setter Property="AutomationProperties.Name" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
         </Style>
         <Style x:Key="Bell" TargetType="ToggleButton">
             <Setter Property="Focusable" Value="False"/>
@@ -189,6 +192,55 @@
                 </ItemsControl>
 
                 <ItemsControl ItemsSource="{Binding Tiles}" ItemTemplate="{StaticResource TileTemplate}"/>
+
+                <!-- Media bar: whatever Windows' media controls say is playing. -->
+                <Border Margin="0,2,0,0" Padding="8,7" CornerRadius="8" Background="{StaticResource TileBg}" DataContext="{Binding Media}"
+                        Visibility="{Binding HasSession, Converter={StaticResource Vis}, FallbackValue=Collapsed}">
+                    <StackPanel>
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Style="{StaticResource Icon}" Content="&#xE892;" ToolTip="Previous" Command="{Binding PreviousCommand}" IsEnabled="{Binding CanPrevious}" FontSize="13"/>
+                                <Button Style="{StaticResource Icon}" Content="{Binding PlayGlyph}" ToolTip="Play / pause" Command="{Binding TogglePlayCommand}" IsEnabled="{Binding CanToggle}" FontSize="15" Foreground="#ECEDEE"/>
+                                <Button Style="{StaticResource Icon}" Content="&#xE893;" ToolTip="Next" Command="{Binding NextCommand}" IsEnabled="{Binding CanNext}" FontSize="13"/>
+                                <Button Style="{StaticResource Icon}" Content="&#xE70E;" ToolTip="Fold / unfold" Command="{Binding ToggleCollapsedCommand}"/>
+                            </StackPanel>
+                            <Border Width="34" Height="34" CornerRadius="4" Margin="0,0,8,0" ClipToBounds="True" Visibility="{Binding Thumb, Converter={StaticResource NotNull}}">
+                                <Border.Background><ImageBrush ImageSource="{Binding Thumb}" Stretch="UniformToFill"/></Border.Background>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}"/>
+                                <TextBlock Text="{Binding Artist}" Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis" Visibility="{Binding Artist, Converter={StaticResource NotNull}}"/>
+                            </StackPanel>
+                        </DockPanel>
+                        <ProgressBar Height="2" Margin="0,6,0,0" Minimum="0" Maximum="1" Value="{Binding Progress}" Foreground="#8B8D98"
+                                     Background="#33353C" BorderThickness="0" Visibility="{Binding HasProgress, Converter={StaticResource Vis}}"/>
+                        <StackPanel Visibility="{Binding Collapsed, Converter={StaticResource InvVis}}">
+                            <DockPanel Margin="0,6,0,0" Visibility="{Binding ShowChips, Converter={StaticResource Vis}}">
+                                <Button DockPanel.Dock="Right" Style="{StaticResource Icon}" Content="&#xE718;" Command="{Binding TogglePinCommand}"
+                                        ToolTip="Stick to this app" Foreground="{Binding IsPinned, Converter={StaticResource PinColor}}"/>
+                                <ItemsControl ItemsSource="{Binding Apps}">
+                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource Btn}" Padding="7,1" Margin="0,0,4,0" Content="{Binding Name}"
+                                                    Command="{Binding DataContext.SelectCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding AppId}"
+                                                    Background="{Binding Selected, Converter={StaticResource ChipBg}}"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </DockPanel>
+                            <DockPanel Margin="0,6,0,0">
+                                <Button DockPanel.Dock="Right" Style="{StaticResource Btn}" Content="YouTube" Margin="4,0,0,0" Command="{Binding SearchYouTubeCommand}"/>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource Btn}" Content="Spotify" Margin="4,0,0,0" Command="{Binding SearchSpotifyCommand}"/>
+                                <Grid>
+                                    <TextBox Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}" KeyDown="MediaSearch_KeyDown"/>
+                                    <TextBlock Text="Search music…" Foreground="#5C5F69" Margin="6,2,0,0" IsHitTestVisible="False"
+                                               Visibility="{Binding Query, Converter={StaticResource EmptyVis}}"/>
+                                </Grid>
+                            </DockPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
 
                 <TextBlock Visibility="{Binding IsEmpty, Converter={StaticResource Vis}}" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="4,2,4,4"
                            Text="Nothing pinned yet. Sources show up under “detected” when they connect. Drag ⌖ onto any window, or drop a shortcut here, to watch it. For Claude Code: tray icon → Connect Claude Code."/>

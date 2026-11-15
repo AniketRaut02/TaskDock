@@ -203,6 +203,13 @@ public partial class MainWindow : Window
         if (InputDialog.Ask("Rename tile", "Label (empty = use the source's name):", vm.Label) is { } label) _vm.Rename(pin, label);
     }
 
+    void MediaSearch_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        _vm.Media?.SearchDefault();
+        e.Handled = true;
+    }
+
     void Tile_MouseEnter(object sender, MouseEventArgs e) => ((sender as FrameworkElement)?.DataContext as TileViewModel)?.Acknowledge();
 
     void TextInput_MouseDown(object sender, MouseButtonEventArgs e)

@@ -33,6 +33,7 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private int _detectedCount;
     [ObservableProperty] private bool _isEmpty = true;
     public bool AutoSort { get; set; } = true;
+    public MediaViewModel? Media { get; set; }
     /// <summary>The source's top-level window, or 0 when it can't be mapped (Claude sessions).</summary>
     internal Func<Tile, nint> WindowOf { get; set; } = _ => 0;
     /// <summary>One-line hints for the user (shown as a tray notification).</summary>

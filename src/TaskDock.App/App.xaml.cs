@@ -103,11 +103,13 @@ public partial class App : Application
             Play(notify.OnTransition(t, prevClass, prevState), t);
         };
 
+        _vm.Media = new MediaViewModel(_settings, text => _vm.ShowHint(text), Dispatcher);
         _window = new MainWindow(_vm, _settings);
         _vm.Sync();
         _window.Show();
         _tray = BuildTray(notify);
         _vm.Hint += text => _tray.ShowNotification("TaskDock", text);
+        await _vm.Media.StartAsync();
 
         // Drain on the UI thread at 10 Hz: every event reaches Notify, the UI repaints once per tick.
         var approvalsChanged = 1;

@@ -8,5 +8,7 @@
         <local:VisConverter x:Key="NotNull" Kind="NotNull"/>
         <local:VisConverter x:Key="NotZero" Kind="NotZero"/>
         <local:VisConverter x:Key="EmptyVis" Kind="Empty"/>
+        <local:VisConverter x:Key="PinColor" Kind="PinColor"/>
+        <local:VisConverter x:Key="ChipBg" Kind="ChipBg"/>
     </Application.Resources>
 </Application>

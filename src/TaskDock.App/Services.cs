@@ -46,6 +46,9 @@ sealed class AppSettings
     public bool AutoSort { get; set; } = true;
     public bool HideWhenFullscreen { get; set; } = true;
     public bool SilentWhenFocused { get; set; } = true;
+    /// <summary>Media bar: an app id the bar sticks to (e.g. Spotify), and whether the strip is folded.</summary>
+    public string? MediaPinnedApp { get; set; }
+    public bool MediaCollapsed { get; set; }
     public string TerminalTemplate { get; set; } = "wt.exe -d \"{cwd}\" {cmd}";
 
     public static AppSettings Load() => Paths.ReadJson<AppSettings>(Paths.Settings) ?? new AppSettings();

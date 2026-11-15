@@ -14,7 +14,7 @@ public sealed record MediaInfo(
 /// Windows' System Media Transport Controls (the API behind the volume flyout). YouTube in Chrome and the
 /// Spotify desktop app both register with it. Changed fires on WinRT threads; callers marshal to their UI.
 /// </summary>
-public sealed class MediaSessions : IDisposable
+public sealed class MediaSessions
 {
     readonly SessionManager _manager;
     readonly HashSet<Session> _hooked = [];
@@ -98,15 +98,14 @@ public sealed class MediaSessions : IDisposable
 
     void Hook()
     {
-        foreach (var s in _manager.GetSessions())
+        var sessions = _manager.GetSessions();
+        foreach (var s in sessions)
         {
             if (!_hooked.Add(s)) continue;
             s.MediaPropertiesChanged += (_, _) => Changed?.Invoke();
             s.PlaybackInfoChanged += (_, _) => Changed?.Invoke();
             s.TimelinePropertiesChanged += (_, _) => Changed?.Invoke();
         }
-        _hooked.RemoveWhere(h => !_manager.GetSessions().Contains(h));
+        _hooked.RemoveWhere(h => !sessions.Contains(h));
     }
-
-    public void Dispose() => _hooked.Clear();
 }

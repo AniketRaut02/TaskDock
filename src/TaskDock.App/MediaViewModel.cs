@@ -97,8 +97,9 @@ public sealed partial class MediaViewModel : ObservableObject
 
         if (_thumbKey != _info.TrackKey)
         {
-            _thumbKey = _info.TrackKey;
-            Thumb = ToImage(await _svc.ThumbnailAsync(_info.AppId, _info.TrackKey));
+            var key = _thumbKey = _info.TrackKey;
+            var img = ToImage(await _svc.ThumbnailAsync(_info.AppId, key));
+            if (_thumbKey == key) Thumb = img; // a faster, newer refresh may have moved on to another track
         }
     }
 

@@ -28,6 +28,9 @@ public sealed partial class TileViewModel(MainViewModel owner, string key) : Obs
     [ObservableProperty] private bool _isPinned;
     [ObservableProperty] private bool _canLaunch;
     [ObservableProperty] private bool _canFocus;
+    [ObservableProperty] private bool _canPlay;
+    [ObservableProperty] private bool _canStopPause;
+    [ObservableProperty] private string _pauseText = "Pause";
     [ObservableProperty] private ApprovalViewModel? _approval;
     [ObservableProperty] private string? _moreApprovals;
 
@@ -57,7 +60,7 @@ public sealed partial class TileViewModel(MainViewModel owner, string key) : Obs
             Class = StatusClass.Offline;
             HasProgress = false;
             CanLaunch = pin.Launch != null;
-            CanFocus = false;
+            CanFocus = CanPlay = CanStopPause = false;
         }
         else
         {
@@ -69,6 +72,9 @@ public sealed partial class TileViewModel(MainViewModel owner, string key) : Obs
             Progress = t.Progress ?? 0;
             CanLaunch = t.Class == StatusClass.Offline && pin?.Launch != null;
             CanFocus = t.Adapter != "claude" && t.Class != StatusClass.Offline;
+            CanPlay = t.Adapter == "unity" && t.State == "Idle";
+            CanStopPause = t.Adapter == "unity" && t.State is "Playing" or "Paused";
+            PauseText = t.State == "Paused" ? "Resume" : "Pause";
         }
         ClassBrush = Palette.Of(Class);
 
@@ -88,6 +94,9 @@ public sealed partial class TileViewModel(MainViewModel owner, string key) : Obs
     [RelayCommand] void Unpin() { if (_pin != null) owner.Unpin(_pin); }
     [RelayCommand] void Launch() { if (_pin != null) owner.Launch(_pin); }
     [RelayCommand] void Focus() { if (_tile != null) owner.Focus(_tile); }
+    [RelayCommand] void Play() { if (_tile != null) owner.Command(_tile, "enterPlay"); }
+    [RelayCommand] void Stop() { if (_tile != null) owner.Command(_tile, "exitPlay"); }
+    [RelayCommand] void Pause() { if (_tile != null) owner.Command(_tile, "togglePause"); }
     public void Acknowledge() { if (_tile != null) owner.Acknowledge(_tile.Key); }
 }
 

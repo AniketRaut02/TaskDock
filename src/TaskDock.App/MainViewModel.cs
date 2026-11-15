@@ -38,6 +38,15 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>One-line hints for the user (shown as a tray notification).</summary>
     internal event Action<string>? Hint;
     internal void ShowHint(string text) => Hint?.Invoke(text);
+    /// <summary>Hub command to an adapter (Unity play/stop/pause). Set by the App.</summary>
+    internal Func<string, string, Task<Core.Protocol.ResultBody>> SendCommand { get; set; } =
+        (_, _) => Task.FromResult(new Core.Protocol.ResultBody("", false, "not connected"));
+
+    internal async void Command(Tile t, string action)
+    {
+        var r = await SendCommand(t.Key, action);
+        if (!r.Ok) ShowHint($"{t.Label}: {action} failed ({r.Error})");
+    }
 
     public bool IsPill => Mode == "pill";
     public bool IsExpanded => Mode == "expanded";

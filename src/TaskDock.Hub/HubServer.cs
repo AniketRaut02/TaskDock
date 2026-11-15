@@ -31,6 +31,18 @@ public sealed class HubOptions
     /// <summary>e.g. "chrome-extension://&lt;fixed id&gt;". Any other Origin is refused.</summary>
     public IReadOnlyCollection<string> AllowedOrigins { get; init; } = [];
     public Action<ILoggingBuilder>? Logging { get; init; }
+    /// <summary>Windows' hung-window check for a process's main window. The App supplies it (Platform owns P/Invoke).</summary>
+    public Func<int, bool> IsHung { get; init; } = _ => false;
+    public Func<int, bool> IsAlive { get; init; } = DefaultIsAlive;
+    /// <summary>Unity's main thread counts as blocked after this much silence (background throttling needs headroom).</summary>
+    public TimeSpan UnityBlockedAfter { get; init; } = TimeSpan.FromSeconds(5);
+
+    static bool DefaultIsAlive(int pid)
+    {
+        try { using var p = System.Diagnostics.Process.GetProcessById(pid); return !p.HasExited; }
+        catch (ArgumentException) { return false; }
+        catch (InvalidOperationException) { return false; }
+    }
 }
 
 /// <summary>
@@ -212,7 +224,6 @@ public sealed class HubServer(HubOptions options, ChannelWriter<StateEvent> sink
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ctx.RequestAborted);
         var watchdog = Watchdog(c, TimeSpan.FromMilliseconds(heartbeatMs * 3), cts.Token);
         var clean = false;
-        var connected = true;
         try
         {
             while (await Receive(ws, cts.Token) is { } text)
@@ -222,11 +233,12 @@ public sealed class HubServer(HubOptions options, ChannelWriter<StateEvent> sink
                 switch (f?.Type)
                 {
                     case "state" when f.Body<StateBody>() is { } s:
-                        c.LastState = s.State;
-                        c.LastLabel = s.Label;
-                        sink.TryWrite(new StateEvent(c.Adapter, c.Instance, s.State, s.Label, s.Detail,
-                            s.Progress is { } pr ? Math.Clamp(pr, 0, 1) : null, c.Match, c.Pid, connected));
-                        connected = false;
+                        c.Last = s with { Progress = s.Progress is { } pr ? Math.Clamp(pr, 0, 1) : null };
+                        Publish(c);
+                        break;
+                    case "heartbeat" when c.Adapter == "unity":
+                        c.PulseAgeMs = f.Body<HeartbeatBody>()?.PulseAgeMs;
+                        Publish(c);
                         break;
                     case "result" when f.Body<ResultBody>() is { } r:
                         if (c.Results.TryGetValue(r.Id, out var tcs)) tcs.TrySetResult(r);
@@ -246,10 +258,63 @@ public sealed class HubServer(HubOptions options, ChannelWriter<StateEvent> sink
             _conns.TryRemove(new KeyValuePair<string, Connection>(c.Key, c));
         }
 
-        // Unity goes silent during a domain reload: keep "Reloading" until the new hello arrives.
-        var reloading = c.Adapter == "unity" && c.LastState?.StartsWith("Reloading", StringComparison.OrdinalIgnoreCase) == true && !clean;
-        if (!reloading) sink.TryWrite(new StateEvent(c.Adapter, c.Instance, "Offline", c.LastLabel ?? c.Instance, Match: c.Match, Pid: c.Pid));
-        if (clean) await Close(ws, WebSocketCloseStatus.NormalClosure, "bye");
+        if (clean || c.Adapter != "unity")
+        {
+            Emit(c, "Offline", null, null); // bye: the tile goes Offline immediately
+            if (clean) await Close(ws, WebSocketCloseStatus.NormalClosure, "bye");
+            return;
+        }
+
+        // Unity goes silent during a domain reload: keep "Reloading" (with elapsed time) until the new hello arrives.
+        if (c.Last?.State.StartsWith("Reloading", StringComparison.OrdinalIgnoreCase) == true) { _ = WatchReload(c); return; }
+        await Task.Delay(300); // a killed editor drops the socket a moment before its process is gone
+        Emit(c, c.Pid is { } pid && !options.IsAlive(pid) ? "Closed" : "Offline", null, null);
+    }
+
+    /// <summary>
+    /// The plan's "reading the silence" rules for Unity, applied on every state and heartbeat:
+    /// hung window → Not responding; main-thread tick older than the limit (not reloading or building) → Main thread blocked.
+    /// </summary>
+    void Publish(Connection c)
+    {
+        if (c.Last is not { } s) return;
+        string state = s.State, detail = s.Detail ?? "";
+        if (c.Adapter == "unity")
+        {
+            var expectedSilence = s.State.StartsWith("Reloading", StringComparison.OrdinalIgnoreCase)
+                || s.State.StartsWith("Building", StringComparison.OrdinalIgnoreCase);
+            if (c.Pid is { } pid && options.IsHung(pid)) state = "Not responding";
+            else if (!expectedSilence && c.PulseAgeMs is { } age && age > options.UnityBlockedAfter.TotalMilliseconds)
+            {
+                state = "Main thread blocked";
+                detail = $"No editor tick for {age / 1000} s" + (s.State == "Idle" ? "" : $" · {s.State}");
+            }
+        }
+        Emit(c, state, detail.Length == 0 ? null : detail, state == s.State ? s.Progress : null);
+    }
+
+    void Emit(Connection c, string state, string? detail, double? progress)
+    {
+        var key = (state, detail, progress);
+        if (c.Emitted == key) return;
+        c.Emitted = key;
+        sink.TryWrite(new StateEvent(c.Adapter, c.Instance, state, c.Last?.Label ?? c.Instance, detail, progress, c.Match, c.Pid, Connected: !c.AnyEmitted));
+        c.AnyEmitted = true;
+    }
+
+    async Task WatchReload(Connection c)
+    {
+        var started = DateTimeOffset.UtcNow;
+        while (DateTimeOffset.UtcNow - started < TimeSpan.FromMinutes(10))
+        {
+            await Task.Delay(1000);
+            if (_conns.ContainsKey(c.Key)) return; // the new domain said hello
+            var secs = (int)(DateTimeOffset.UtcNow - started).TotalSeconds;
+            if (c.Pid is { } pid && !options.IsAlive(pid)) { Emit(c, "Closed", null, null); return; }
+            if (c.Pid is { } p2 && options.IsHung(p2)) Emit(c, "Not responding", $"Reloading for {secs} s", null);
+            else Emit(c, c.Last!.State, $"{secs} s", null);
+        }
+        Emit(c, "Offline", "Never came back from a domain reload", null);
     }
 
     static async Task Watchdog(Connection c, TimeSpan limit, CancellationToken ct)
@@ -291,7 +356,8 @@ public sealed class HubServer(HubOptions options, ChannelWriter<StateEvent> sink
 
     static async Task Close(WebSocket ws, WebSocketCloseStatus status, string why)
     {
-        try { if (ws.State == WebSocketState.Open) await ws.CloseAsync(status, why, CancellationToken.None); }
+        // CloseOutputAsync: don't wait for the peer's close reply, which a dying adapter may never send.
+        try { if (ws.State is WebSocketState.Open or WebSocketState.CloseReceived) await ws.CloseOutputAsync(status, why, CancellationToken.None); }
         catch (WebSocketException) { }
     }
 
@@ -306,8 +372,10 @@ public sealed class HubServer(HubOptions options, ChannelWriter<StateEvent> sink
         public IReadOnlyDictionary<string, string> Match { get; } = hello.Match ?? new Dictionary<string, string>();
         public int? Pid { get; } = hello.Pid;
         public DateTimeOffset LastSeen { get; set; } = DateTimeOffset.UtcNow;
-        public string? LastState { get; set; }
-        public string? LastLabel { get; set; }
+        public StateBody? Last { get; set; }
+        public int? PulseAgeMs { get; set; }
+        public (string, string?, double?)? Emitted { get; set; }
+        public bool AnyEmitted { get; set; }
         public ConcurrentDictionary<string, TaskCompletionSource<ResultBody>> Results { get; } = new();
 
         public async Task Send<T>(string type, T body)

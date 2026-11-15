@@ -10,6 +10,7 @@ using H.NotifyIcon;
 using Serilog;
 using TaskDock.Core.Notify;
 using TaskDock.Core.Tiles;
+using Sound = TaskDock.Core.Tiles.Sound;
 using TaskDock.Hub;
 using TaskDock.Platform;
 
@@ -59,6 +60,7 @@ public partial class App : Application
         {
             HoldWindow = TimeSpan.FromSeconds(_settings.HoldSeconds),
             Logging = l => l.AddSerilog(Log.Logger),
+            IsHung = IsMainWindowHung,
         }, events.Writer, broker);
         await _hub.StartAsync();
         Log.Information("Hub listening on 127.0.0.1:{Port}", _hub.Port);
@@ -75,6 +77,7 @@ public partial class App : Application
         {
             AutoSort = _settings.AutoSort,
         };
+        _vm.SendCommand = (key, action) => _hub.SendCommandAsync(key, action);
         var generic = new GenericWatcher();
         _vm.WindowOf = t => WindowOf(t, generic);
 
@@ -88,7 +91,17 @@ public partial class App : Application
             // Stay silent when you're already looking at the source (Claude sessions can't be mapped to a window).
             IsForeground = t => _settings.SilentWhenFocused && _vm.WindowOf(t) is var h && h != 0 && h == Platform.Desktop.Foreground(),
         };
-        registry.Transition += (t, prevClass, prevState) => sounds.Play(notify.OnTransition(t, prevClass, prevState));
+        void Play(Sound s, Tile t)
+        {
+            if (s == Sound.None) return;
+            Log.Information("Sound {Sound} for {Adapter}:{Instance}", s, t.Adapter, t.Instance);
+            sounds.Play(s);
+        }
+        registry.Transition += (t, prevClass, prevState) =>
+        {
+            Log.Information("Tile {Adapter}:{Instance} {Prev} -> {State}", t.Adapter, t.Instance, prevState, t.State); // state names only, no content
+            Play(notify.OnTransition(t, prevClass, prevState), t);
+        };
 
         _window = new MainWindow(_vm, _settings);
         _vm.Sync();
@@ -104,6 +117,7 @@ public partial class App : Application
         {
             var dirty = Interlocked.Exchange(ref approvalsChanged, 0) == 1;
             while (events.Reader.TryRead(out var ev)) { registry.Apply(ev); dirty = true; }
+            if (notify.Tick() is var (settled, tile) && tile != null) Play(settled, tile); // Unity's settle window
             if (++tick % 10 == 0)
             {
                 foreach (var ev in generic.Tick(_vm.Preset.Tiles)) { registry.Apply(ev); dirty = true; }
@@ -117,6 +131,18 @@ public partial class App : Application
             }
         }, Dispatcher);
         timer.Start();
+    }
+
+    /// <summary>Windows' own "not responding" check on a process's main window (called from the hub's threads).</summary>
+    static bool IsMainWindowHung(int pid)
+    {
+        try
+        {
+            using var p = Process.GetProcessById(pid);
+            return p.MainWindowHandle != 0 && Win32.IsHungAppWindow(p.MainWindowHandle);
+        }
+        catch (ArgumentException) { return false; } // exited
+        catch (InvalidOperationException) { return false; }
     }
 
     /// <summary>Hide while something is fullscreen (games, presentations, fullscreen video).</summary>

@@ -16,6 +16,9 @@ public sealed record WelcomeBody(int HeartbeatMs, bool NotifyEnabled);
 
 public sealed record StateBody(string State, string Label, string? Detail = null, double? Progress = null, JsonElement? Items = null);
 
+/// <summary>Unity sends PulseAgeMs: how long ago EditorApplication.update last ran. Other adapters send {}.</summary>
+public sealed record HeartbeatBody(int? PulseAgeMs = null);
+
 public sealed record CommandBody(string Id, string Action, JsonElement? Args = null);
 
 public sealed record ResultBody(string Id, bool Ok, string? Error = null);

@@ -21,6 +21,7 @@
     { "if": { "properties": { "type": { "const": "hello" } } }, "then": { "properties": { "body": { "$ref": "#/$defs/hello" } } } },
     { "if": { "properties": { "type": { "const": "welcome" } } }, "then": { "properties": { "body": { "$ref": "#/$defs/welcome" } } } },
     { "if": { "properties": { "type": { "const": "state" } } }, "then": { "properties": { "body": { "$ref": "#/$defs/state" } } } },
+    { "if": { "properties": { "type": { "const": "heartbeat" } } }, "then": { "properties": { "body": { "$ref": "#/$defs/heartbeat" } } } },
     { "if": { "properties": { "type": { "const": "command" } } }, "then": { "properties": { "body": { "$ref": "#/$defs/command" } } } },
     { "if": { "properties": { "type": { "const": "result" } } }, "then": { "properties": { "body": { "$ref": "#/$defs/result" } } } },
     { "if": { "properties": { "type": { "const": "bye" } } }, "then": { "properties": { "body": { "$ref": "#/$defs/bye" } } } }
@@ -54,6 +55,12 @@
         "detail": { "type": "string" },
         "progress": { "type": "number", "minimum": 0, "maximum": 1 },
         "items": { "type": "array" }
+      }
+    },
+    "heartbeat": {
+      "type": "object",
+      "properties": {
+        "pulseAgeMs": { "type": "integer", "minimum": 0, "description": "Unity only: ms since EditorApplication.update last ran. Over 5000 (not reloading or building) = Main thread blocked" }
       }
     },
     "command": {

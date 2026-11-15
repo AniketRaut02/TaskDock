@@ -1,0 +1,11 @@
+{
+  "name": "com.darkpixelgd.taskdock",
+  "version": "0.1.0",
+  "displayName": "TaskDock",
+  "description": "Reports Unity Editor state (compiling, reloading, importing, play mode, building, background tasks) to the TaskDock desktop widget over a local WebSocket. Editor-only; nothing ships in player builds.",
+  "unity": "2022.3",
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  },
+  "author": { "name": "DarkPixel GD" }
+}

@@ -19,11 +19,13 @@ public sealed class HubTests : IAsyncLifetime
     readonly ApprovalBroker _broker = new();
     readonly string _dir = Path.Combine(Path.GetTempPath(), "taskdock-tests-" + Guid.NewGuid().ToString("N"));
     HubServer _hub = null!;
+    volatile bool _hung, _alive = true;
     HttpClient _http = null!;
 
     public async Task InitializeAsync()
     {
         _hub = new HubServer(new HubOptions { DataDir = _dir, BasePort = 0, HoldWindow = TimeSpan.FromSeconds(5),
+            IsHung = _ => _hung, IsAlive = _ => _alive,
             AllowedOrigins = ["chrome-extension://goodid"] }, _events.Writer, _broker);
         await _hub.StartAsync();
         _http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{_hub.Port}") };
@@ -228,17 +230,88 @@ public sealed class HubTests : IAsyncLifetime
         await Assert.ThrowsAsync<WebSocketException>(() => Connect("https://evil.example"));
     }
 
-    [Fact]
-    public async Task Unity_socket_drop_while_reloading_keeps_reloading()
+    async Task<ClientWebSocket> Unity(string firstState)
     {
         var ws = await Connect();
-        await Send(ws, "hello", new HelloBody("unity", "u:1", Token: _hub.Token));
+        await Send(ws, "hello", new HelloBody("unity", "u:1", Pid: 4242, Match: new() { ["projectPath"] = "D:/p" }, Token: _hub.Token));
         await Read(ws);
-        await Send(ws, "state", new StateBody("Reloading", "Fatebound"));
-        await _events.Reader.ReadAsync();
+        await Send(ws, "state", new StateBody(firstState, "Fatebound"));
+        Assert.Equal(firstState, (await _events.Reader.ReadAsync()).State);
+        return ws;
+    }
+
+    async Task<StateEvent> Next() => await _events.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+
+    [Fact]
+    public async Task Unity_reload_keeps_reloading_with_elapsed_time_until_the_new_hello()
+    {
+        var ws = await Unity("Reloading");
         ws.Abort();
-        ws.Dispose();
-        await Task.Delay(500);
+        var e = await Next();
+        Assert.Equal(("Reloading", "1 s"), (e.State, e.Detail));
+
+        using var again = await Connect();
+        await Send(again, "hello", new HelloBody("unity", "u:1", Pid: 4242, Token: _hub.Token));
+        await Read(again);
+        await Send(again, "state", new StateBody("Idle", "Fatebound"));
+        for (var i = 0; i < 10; i++)
+        {
+            var n = await Next();
+            if (n.State == "Idle") { Assert.True(n.Connected); return; }
+            Assert.Equal("Reloading", n.State);
+        }
+        Assert.Fail("never saw Idle");
+    }
+
+    [Fact]
+    public async Task Unity_silent_main_thread_is_blocked_and_recovers()
+    {
+        using var ws = await Unity("Importing");
+        await Send(ws, "heartbeat", new HeartbeatBody(6500));
+        var e = await Next();
+        Assert.Equal(("Main thread blocked", "No editor tick for 6 s · Importing"), (e.State, e.Detail));
+        await Send(ws, "heartbeat", new HeartbeatBody(40));
+        Assert.Equal("Importing", (await Next()).State);
+    }
+
+    [Fact]
+    public async Task Unity_building_is_expected_silence()
+    {
+        using var ws = await Unity("Building");
+        await Send(ws, "heartbeat", new HeartbeatBody(60_000));
+        await Task.Delay(300);
         Assert.False(_events.Reader.TryRead(out _));
+    }
+
+    [Fact]
+    public async Task Unity_hung_window_is_not_responding()
+    {
+        using var ws = await Unity("Compiling");
+        _hung = true;
+        await Send(ws, "heartbeat", new HeartbeatBody(9000));
+        Assert.Equal("Not responding", (await Next()).State);
+    }
+
+    [Fact]
+    public async Task Unity_killed_is_closed_and_a_dropped_socket_with_live_process_is_offline()
+    {
+        var ws = await Unity("Idle");
+        _alive = false;
+        ws.Abort();
+        Assert.Equal("Closed", (await Next()).State);
+
+        _alive = true;
+        var ws2 = await Unity("Playing");
+        ws2.Abort();
+        Assert.Equal("Offline", (await Next()).State);
+    }
+
+    [Fact]
+    public async Task Unity_process_dying_mid_reload_is_closed()
+    {
+        var ws = await Unity("Reloading");
+        _alive = false;
+        ws.Abort();
+        Assert.Equal("Closed", (await Next()).State);
     }
 }

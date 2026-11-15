@@ -25,7 +25,7 @@ public class ContractTests
             "command" => env.Body<CommandBody>(),
             "result" => env.Body<ResultBody>(),
             "bye" => env.Body<ByeBody>(),
-            "heartbeat" => new { },
+            "heartbeat" => env.Body<HeartbeatBody>(),
             _ => throw new Xunit.Sdk.XunitException($"unknown type {env.Type}"),
         };
         Assert.NotNull(body);

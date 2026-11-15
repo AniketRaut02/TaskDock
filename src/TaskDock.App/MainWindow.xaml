@@ -104,6 +104,12 @@
                         </StackPanel>
                         <Button Style="{StaticResource Btn}" Content="Launch" HorizontalAlignment="Left" Margin="0,6,0,0" Command="{Binding LaunchCommand}"
                                 Visibility="{Binding CanLaunch, Converter={StaticResource Vis}}"/>
+                        <Button Style="{StaticResource Btn}" Content="▶ Play" HorizontalAlignment="Left" Margin="0,6,0,0" Command="{Binding PlayCommand}"
+                                Visibility="{Binding CanPlay, Converter={StaticResource Vis}}"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0" Visibility="{Binding CanStopPause, Converter={StaticResource Vis}}">
+                            <Button Style="{StaticResource Btn}" Content="■ Stop" Command="{Binding StopCommand}"/>
+                            <Button Style="{StaticResource Btn}" Content="{Binding PauseText}" Command="{Binding PauseCommand}"/>
+                        </StackPanel>
 
                         <!-- Approval card: one per pending request, queued per tile. -->
                         <Border Margin="0,8,0,0" Padding="8" CornerRadius="6" Background="#2F2A1F" BorderBrush="#5A4A22" BorderThickness="1"

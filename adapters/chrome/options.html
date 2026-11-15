@@ -1,0 +1,16 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>TaskDock downloads</title>
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 24px; max-width: 520px; }
+  label { display: block; margin-top: 16px; }
+  input { width: 8em; }
+  #status { font-weight: 600; }
+  .hint { color: #666; font-size: 12px; }
+</style>
+<h1>TaskDock downloads</h1>
+<p>Status: <span id="status">checking…</span></p>
+<label>Port override <input id="port" type="number" min="0" max="65535" placeholder="auto"></label>
+<p class="hint">Leave empty to find TaskDock on ports 47820–47829.</p>
+<p class="hint">This extension sends file names, sizes, states and local file paths to TaskDock on this computer (127.0.0.1). It never sends download URLs.</p>
+<script src="options.js"></script>

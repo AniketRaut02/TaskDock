@@ -40,6 +40,7 @@ public sealed class TileRegistry(TimeProvider time)
         t.Progress = e.Progress;
         if (e.Match != null) t.Match = e.Match;
         if (e.Pid != null) t.Pid = e.Pid;
+        t.Items = e.Items;
         t.UpdatedAt = now;
 
         if (prevClass != t.Class || prevState != t.State) Transition?.Invoke(t, prevClass, prevState);

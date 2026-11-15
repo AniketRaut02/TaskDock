@@ -107,6 +107,31 @@
                         </StackPanel>
                         <Button Style="{StaticResource Btn}" Content="Launch" HorizontalAlignment="Left" Margin="0,6,0,0" Command="{Binding LaunchCommand}"
                                 Visibility="{Binding CanLaunch, Converter={StaticResource Vis}}"/>
+                        <!-- Downloads: expandable file list -->
+                        <Button Style="{StaticResource Btn}" Content="{Binding ItemsToggleText}" HorizontalAlignment="Left" Margin="0,6,0,0" Padding="7,1"
+                                Command="{Binding ToggleItemsCommand}" Visibility="{Binding ItemsToggleText, Converter={StaticResource NotNull}}"/>
+                        <ItemsControl ItemsSource="{Binding Items}" Margin="0,4,0,0" Visibility="{Binding ShowItems, Converter={StaticResource Vis}}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:DownloadItemViewModel}">
+                                    <StackPanel Margin="0,4,0,2">
+                                        <DockPanel>
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                                <Button Style="{StaticResource Icon}" Content="&#xE769;" ToolTip="Pause" Command="{Binding PauseCommand}" Visibility="{Binding CanPause, Converter={StaticResource Vis}}"/>
+                                                <Button Style="{StaticResource Icon}" Content="&#xE768;" ToolTip="Resume" Command="{Binding ResumeCommand}" Visibility="{Binding CanResume, Converter={StaticResource Vis}}"/>
+                                                <Button Style="{StaticResource Icon}" Content="&#xE711;" ToolTip="Cancel" Command="{Binding CancelCommand}" Visibility="{Binding CanCancel, Converter={StaticResource Vis}}"/>
+                                                <Button Style="{StaticResource Icon}" Content="&#xE8E5;" ToolTip="Open" Command="{Binding OpenCommand}" Visibility="{Binding CanOpen, Converter={StaticResource Vis}}"/>
+                                                <Button Style="{StaticResource Icon}" Content="&#xE838;" ToolTip="Show in folder" Command="{Binding ShowCommand}" Visibility="{Binding CanOpen, Converter={StaticResource Vis}}"/>
+                                            </StackPanel>
+                                            <TextBlock TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip="{Binding File}">
+                                                <Run Text="{Binding File, Mode=OneWay}"/><Run Text="  "/><Run Text="{Binding StateText, Mode=OneWay}" Foreground="{StaticResource Muted}"/>
+                                            </TextBlock>
+                                        </DockPanel>
+                                        <ProgressBar Height="2" Margin="0,3,0,0" Minimum="0" Maximum="1" Value="{Binding Progress, Mode=OneWay}" Foreground="#3E8EF7"
+                                                     Background="#33353C" BorderThickness="0" Visibility="{Binding HasProgress, Converter={StaticResource Vis}}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                         <Button Style="{StaticResource Btn}" Content="▶ Play" HorizontalAlignment="Left" Margin="0,6,0,0" Command="{Binding PlayCommand}"
                                 Visibility="{Binding CanPlay, Converter={StaticResource Vis}}"/>
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0" Visibility="{Binding CanStopPause, Converter={StaticResource Vis}}">

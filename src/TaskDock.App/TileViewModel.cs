@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+using System.Text.Json;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -31,6 +33,11 @@ public sealed partial class TileViewModel(MainViewModel owner, string key) : Obs
     [ObservableProperty] private bool _canPlay;
     [ObservableProperty] private bool _canStopPause;
     [ObservableProperty] private string _pauseText = "Pause";
+    [ObservableProperty] private bool _showItems;
+    [ObservableProperty] private string? _itemsToggleText;
+
+    /// <summary>Downloads tile: the item list, expandable.</summary>
+    public ObservableCollection<DownloadItemViewModel> Items { get; } = [];
     [ObservableProperty] private ApprovalViewModel? _approval;
     [ObservableProperty] private string? _moreApprovals;
 
@@ -61,6 +68,7 @@ public sealed partial class TileViewModel(MainViewModel owner, string key) : Obs
             HasProgress = false;
             CanLaunch = pin.Launch != null;
             CanFocus = CanPlay = CanStopPause = false;
+            SyncItems(null);
         }
         else
         {
@@ -71,9 +79,10 @@ public sealed partial class TileViewModel(MainViewModel owner, string key) : Obs
             HasProgress = t.Progress != null;
             Progress = t.Progress ?? 0;
             CanLaunch = t.Class == StatusClass.Offline && pin?.Launch != null;
-            CanFocus = t.Adapter != "claude" && t.Class != StatusClass.Offline;
+            CanFocus = t.Adapter is not ("claude" or "downloads") && t.Class != StatusClass.Offline; // neither reports a window
             CanPlay = t.Adapter == "unity" && t.State == "Idle";
             CanStopPause = t.Adapter == "unity" && t.State is "Playing" or "Paused";
+            SyncItems(t.Adapter == "downloads" ? t.Items : null);
             PauseText = t.State == "Paused" ? "Resume" : "Pause";
         }
         ClassBrush = Palette.Of(Class);
@@ -97,6 +106,20 @@ public sealed partial class TileViewModel(MainViewModel owner, string key) : Obs
     [RelayCommand] void Play() { if (_tile != null) owner.Command(_tile, "enterPlay"); }
     [RelayCommand] void Stop() { if (_tile != null) owner.Command(_tile, "exitPlay"); }
     [RelayCommand] void Pause() { if (_tile != null) owner.Command(_tile, "togglePause"); }
+    [RelayCommand] void ToggleItems() => ShowItems = !ShowItems;
+
+    void SyncItems(JsonElement? items)
+    {
+        Items.Clear();
+        if (items is { ValueKind: JsonValueKind.Array } arr)
+            foreach (var i in arr.EnumerateArray().Take(20)) Items.Add(new DownloadItemViewModel(i, this));
+        ItemsToggleText = Items.Count == 0 ? null : (ShowItems ? "Hide files" : $"Files ({Items.Count})");
+    }
+    partial void OnShowItemsChanged(bool value) => ItemsToggleText = Items.Count == 0 ? null : (value ? "Hide files" : $"Files ({Items.Count})");
+
+    internal void ItemCommand(string action, int downloadId) =>
+        owner.Command(_tile!, action, JsonSerializer.SerializeToElement(new { downloadId }));
+    internal void OpenItem(string? path, bool showInFolder) => owner.OpenDownload(path, showInFolder);
     public void Acknowledge() { if (_tile != null) owner.Acknowledge(_tile.Key); }
 }
 
@@ -117,4 +140,39 @@ public sealed partial class ApprovalViewModel(PendingApproval p, MainViewModel o
     [RelayCommand] void Deny() => owner.Resolve(Id, ApprovalChoice.Deny, DenyReason);
     [RelayCommand] void Terminal() => owner.Resolve(Id, ApprovalChoice.Terminal, null);
     [RelayCommand] void ToggleExpanded() => Expanded = !Expanded;
+}
+
+/// <summary>One download in the tile's list. Pause/Resume/Cancel go to the browser; Open/Show run locally.</summary>
+public sealed partial class DownloadItemViewModel(JsonElement i, TileViewModel tile)
+{
+    static string? Str(JsonElement e, string k) => e.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+    static double? Num(JsonElement e, string k) => e.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetDouble() : null;
+
+    readonly int _id = (int)(Num(i, "id") ?? -1);
+    readonly string? _path = Str(i, "path");
+    readonly string _state = Str(i, "state") ?? "";
+
+    public string File { get; } = Str(i, "file") ?? "download";
+    public double Progress { get; } = Num(i, "total") is > 0 and var t ? (Num(i, "bytes") ?? 0) / t : 0;
+    public bool HasProgress => _state is "in_progress" or "paused" && Num(i, "total") is > 0;
+    public string StateText => _state switch
+    {
+        "in_progress" => $"{Progress:P0}" + (Num(i, "speed") is > 0 and var s ? $" · {s / 1048576:0.0} MB/s" : ""),
+        "paused" => $"Paused · {Progress:P0}",
+        "complete" => "Done",
+        "failed" => "Failed" + (Str(i, "error") is { } e ? $" · {e.ToLowerInvariant().Replace('_', ' ')}" : ""),
+        "canceled" => "Canceled",
+        "dangerous" => "Waiting for you in the browser",
+        _ => _state,
+    };
+    public bool CanPause => _state == "in_progress";
+    public bool CanResume => _state == "paused";
+    public bool CanCancel => _state is "in_progress" or "paused";
+    public bool CanOpen => _state == "complete" && _path != null;
+
+    [RelayCommand] void Pause() => tile.ItemCommand("pause", _id);
+    [RelayCommand] void Resume() => tile.ItemCommand("resume", _id);
+    [RelayCommand] void Cancel() => tile.ItemCommand("cancel", _id);
+    [RelayCommand] void Open() => tile.OpenItem(_path, false);
+    [RelayCommand] void Show() => tile.OpenItem(_path, true);
 }

@@ -295,10 +295,12 @@ public sealed class HubServer(HubOptions options, ChannelWriter<StateEvent> sink
 
     void Emit(Connection c, string state, string? detail, double? progress)
     {
-        var key = (state, detail, progress);
+        var items = state == c.Last?.State ? c.Last.Items : null; // synthetic states (blocked, offline) carry no items
+        var key = (state, detail, progress, items?.GetRawText());
         if (c.Emitted == key) return;
         c.Emitted = key;
-        sink.TryWrite(new StateEvent(c.Adapter, c.Instance, state, c.Last?.Label ?? c.Instance, detail, progress, c.Match, c.Pid, Connected: !c.AnyEmitted));
+        sink.TryWrite(new StateEvent(c.Adapter, c.Instance, state, c.Last?.Label ?? c.Instance, detail, progress, c.Match, c.Pid,
+            Connected: !c.AnyEmitted, Items: items));
         c.AnyEmitted = true;
     }
 
@@ -374,7 +376,7 @@ public sealed class HubServer(HubOptions options, ChannelWriter<StateEvent> sink
         public DateTimeOffset LastSeen { get; set; } = DateTimeOffset.UtcNow;
         public StateBody? Last { get; set; }
         public int? PulseAgeMs { get; set; }
-        public (string, string?, double?)? Emitted { get; set; }
+        public (string, string?, double?, string?)? Emitted { get; set; }
         public bool AnyEmitted { get; set; }
         public ConcurrentDictionary<string, TaskCompletionSource<ResultBody>> Results { get; } = new();
 

@@ -21,7 +21,8 @@ A small always-on-top Windows widget that shows the live state of running work. 
 | Acrylic backdrop, snap animation, settings window, Start with Windows | **Not started** (solid background for now) |
 | Unity package `com.darkpixelgd.taskdock` (Phase 3): every state in the plan's Unity table, background Progress items, Play / Stop / Pause from the tile, Preferences → TaskDock. Hub-side silence rules: Reloading held through the domain reload with elapsed seconds, Main thread blocked, Not responding, Closed. Notify settle: one sound per compile → reload → import chain, silent for play mode | See "Unity" below for what was verified |
 | Media bar (Phase 4): whatever Windows' media controls say is playing. Title, artist and thumbnail; previous / play-pause / next (greyed when the app doesn't offer them); a progress line; chips to switch sessions; a pin to stick to one app; Spotify / YouTube search (Enter searches where the music is playing). Using the controls makes the bar stick to that app | Checked with a silent test session: metadata 37–62 ms after a press, thumbnails from a real Brave/YouTube session. Search links are unit-tested but weren't opened; untested with Spotify |
-| Chrome extension, VS Code extension | **Not started** (Phases 5–6) |
+| Browser downloads extension (Phase 5, `adapters/chrome`): MV3, loads unpacked in Chrome, Edge and Brave. One tile per browser profile: Downloading (n, %) with speed and time left, Needs confirmation, Complete, Failed, Paused. An expandable file list with Pause / Resume / Cancel (sent to the browser) and Open / Show in folder (run by the widget). Sends file names, sizes, states and local paths, never URLs. A fixed key pins the extension ID; the hub accepts only that Origin | Checked in headless Edge 157: progress every second, 3 concurrent downloads, Cancel, Pause → Resume, one Complete sound per file, recovery after a browser restart and after the worker was killed. Not checked: a real network failure (Edge kept retrying, then called the partial file complete), Chrome, Brave |
+| VS Code extension | **Not started** (Phase 6) |
 
 ## Run
 
@@ -43,6 +44,14 @@ dotnet run --project tools/TaskDock.FakeAdapter -- claude 30
 
 ```bash
 dotnet run --project tools/TaskDock.FakeAdapter -- demo 60
+```
+
+## Browser downloads
+
+In Chrome, Edge or Brave: open `chrome://extensions` (Edge: `edge://extensions`), turn on **Developer mode**, click **Load unpacked**, and pick the `adapters/chrome` folder. The extension finds TaskDock on ports 47820–47829. Its options page shows the connection status and has a port override. The downloads tile shows up under "+N detected": pin it, and turn on the bell for a sound per finished file.
+
+```bash
+node --test "adapters/chrome/test/*.test.mjs"
 ```
 
 ## Unity

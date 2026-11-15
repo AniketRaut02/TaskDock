@@ -19,6 +19,9 @@ namespace TaskDock.App;
 /// <summary>Composition root: hub → channel → registry (UI thread, 10 Hz) → view model, notify, tray.</summary>
 public partial class App : Application
 {
+    /// <summary>The browser extension's ID is fixed by the public key in adapters/chrome/manifest.json.</summary>
+    const string DownloadsExtensionOrigin = "chrome-extension://dojcaemiadcannmfbinpkfjpnhggadej";
+
     Mutex? _single;
     HubServer? _hub;
     TaskbarIcon? _tray;
@@ -60,6 +63,7 @@ public partial class App : Application
         {
             HoldWindow = TimeSpan.FromSeconds(_settings.HoldSeconds),
             Logging = l => l.AddSerilog(Log.Logger),
+            AllowedOrigins = [DownloadsExtensionOrigin],
             IsHung = IsMainWindowHung,
         }, events.Writer, broker);
         await _hub.StartAsync();
@@ -77,7 +81,7 @@ public partial class App : Application
         {
             AutoSort = _settings.AutoSort,
         };
-        _vm.SendCommand = (key, action) => _hub.SendCommandAsync(key, action);
+        _vm.SendCommand = (key, action, args) => _hub.SendCommandAsync(key, action, args);
         var generic = new GenericWatcher();
         _vm.WindowOf = t => WindowOf(t, generic);
 

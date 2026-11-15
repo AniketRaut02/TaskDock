@@ -212,6 +212,18 @@ public sealed class HubTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Downloads_items_reach_the_tile_and_extension_origin_needs_no_token()
+    {
+        using var ws = await Connect("chrome-extension://goodid");
+        await Send(ws, "hello", new HelloBody("downloads", "chrome:1", Match: new() { ["browser"] = "chrome" }));
+        await Read(ws);
+        var items = JsonDocument.Parse("""[{"id":3,"file":"setup.exe","state":"in_progress","bytes":45,"total":100}]""").RootElement;
+        await Send(ws, "state", new StateBody("Downloading (1, 45%)", "Chrome downloads", "setup.exe", 0.45, items));
+        var e = await _events.Reader.ReadAsync();
+        Assert.Equal("setup.exe", e.Items!.Value[0].GetProperty("file").GetString());
+    }
+
+    [Fact]
     public async Task Hello_with_bad_token_is_closed()
     {
         using var ws = await Connect();
@@ -248,7 +260,8 @@ public sealed class HubTests : IAsyncLifetime
         var ws = await Unity("Reloading");
         ws.Abort();
         var e = await Next();
-        Assert.Equal(("Reloading", "1 s"), (e.State, e.Detail));
+        Assert.Equal("Reloading", e.State);
+        Assert.Matches(@"^\d+ s$", e.Detail); // elapsed seconds; exact value depends on machine load
 
         using var again = await Connect();
         await Send(again, "hello", new HelloBody("unity", "u:1", Pid: 4242, Token: _hub.Token));

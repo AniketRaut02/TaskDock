@@ -40,13 +40,30 @@ public sealed partial class MainViewModel : ObservableObject
     internal event Action<string>? Hint;
     internal void ShowHint(string text) => Hint?.Invoke(text);
     /// <summary>Hub command to an adapter (Unity play/stop/pause). Set by the App.</summary>
-    internal Func<string, string, Task<Core.Protocol.ResultBody>> SendCommand { get; set; } =
-        (_, _) => Task.FromResult(new Core.Protocol.ResultBody("", false, "not connected"));
+    internal Func<string, string, System.Text.Json.JsonElement?, Task<Core.Protocol.ResultBody>> SendCommand { get; set; } =
+        (_, _, _) => Task.FromResult(new Core.Protocol.ResultBody("", false, "not connected"));
 
-    internal async void Command(Tile t, string action)
+    internal async void Command(Tile t, string action, System.Text.Json.JsonElement? args = null)
     {
-        var r = await SendCommand(t.Key, action);
+        var r = await SendCommand(t.Key, action, args);
         if (!r.Ok) ShowHint($"{t.Label}: {action} failed ({r.Error})");
+    }
+
+    /// <summary>Open and Show in folder run here from the item's local path, so the extension needs no downloads.open permission.</summary>
+    internal void OpenDownload(string? path, bool showInFolder)
+    {
+        // The path comes from an adapter: only act on an existing local file.
+        if (path == null || !Path.IsPathFullyQualified(path) || !File.Exists(path))
+        {
+            ShowHint("That file isn't there any more.");
+            return;
+        }
+        try
+        {
+            if (showInFolder) Process.Start("explorer.exe", $"/select,\"{path}\"")?.Dispose();
+            else Process.Start(new ProcessStartInfo(path) { UseShellExecute = true })?.Dispose();
+        }
+        catch (Win32Exception ex) { ShowHint($"Couldn't open {Path.GetFileName(path)}: {ex.Message}"); }
     }
 
     public bool IsPill => Mode == "pill";

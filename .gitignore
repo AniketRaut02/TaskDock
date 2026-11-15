@@ -4,3 +4,7 @@ obj/
 *.user
 artifacts/
 node_modules/
+
+# build outputs of the adapters
+adapters/vscode/dist/
+*.vsix

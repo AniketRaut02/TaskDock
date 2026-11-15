@@ -1,0 +1,43 @@
+{
+  "name": "taskdock",
+  "displayName": "TaskDock",
+  "description": "Reports this window's tasks, debug sessions and long terminal commands (with exit codes) to the TaskDock desktop widget.",
+  "version": "0.1.0",
+  "publisher": "darkpixelgd",
+  "repository": { "type": "git", "url": "https://github.com/AniketRaut02/TaskDock" },
+  "engines": { "vscode": "^1.93.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "TaskDock",
+      "properties": {
+        "taskdock.longCommandSeconds": {
+          "type": "number", "default": 10, "minimum": 0,
+          "description": "Terminal commands that run at least this long are reported (so `ls` makes no noise)."
+        },
+        "taskdock.notifyOnDebugEnd": {
+          "type": "boolean", "default": false,
+          "description": "Report a finished debug session as Succeeded, so TaskDock can play its Complete sound."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc --noEmit && esbuild src/extension.ts --bundle --platform=node --format=cjs --target=node20 --external:vscode --external:bufferutil --external:utf-8-validate --outfile=dist/extension.js",
+    "test": "node --test test/*.test.ts",
+    "package": "npm run build && vsce package --skip-license"
+  },
+  "dependencies": {
+    "ws": "8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.9",
+    "@types/vscode": "1.93.0",
+    "@types/ws": "8.18.1",
+    "@vscode/vsce": "3.6.0",
+    "esbuild": "0.25.8",
+    "typescript": "5.9.2"
+  }
+}

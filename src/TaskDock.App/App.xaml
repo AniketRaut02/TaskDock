@@ -1,0 +1,12 @@
+﻿<Application x:Class="TaskDock.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:TaskDock.App"
+             ShutdownMode="OnExplicitShutdown">
+    <Application.Resources>
+        <local:VisConverter x:Key="InvVis" Kind="Inverse"/>
+        <local:VisConverter x:Key="NotNull" Kind="NotNull"/>
+        <local:VisConverter x:Key="NotZero" Kind="NotZero"/>
+        <local:VisConverter x:Key="EmptyVis" Kind="Empty"/>
+    </Application.Resources>
+</Application>

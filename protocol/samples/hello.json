@@ -1,0 +1,1 @@
+{"v":1,"type":"hello","seq":1,"ts":1763200000000,"src":{"adapter":"unity","instance":"unity:8812:3f9ac1"},"body":{"adapter":"unity","instance":"unity:8812:3f9ac1","version":"0.1.0","pid":8812,"match":{"projectPath":"D:/Projects/Fatebound"},"actions":["enterPlay","exitPlay","togglePause"],"token":"t"}}

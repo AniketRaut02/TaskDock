@@ -1,0 +1,1 @@
+{"v":1,"type":"state","seq":7,"ts":1763200000000,"src":{"adapter":"downloads","instance":"chrome:7b1e"},"body":{"state":"Downloading (2, 45%)","label":"Chrome","detail":"setup.exe · 12 MB/s","progress":0.45,"items":[{"id":3,"file":"setup.exe","state":"in_progress","bytes":4500,"total":10000}]}}

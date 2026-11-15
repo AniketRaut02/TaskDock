@@ -1,0 +1,47 @@
+using System.Collections.Concurrent;
+using System.Text.Json;
+
+namespace TaskDock.Hub;
+
+public enum ApprovalChoice { Allow, AlwaysAllow, Deny, Terminal }
+
+public sealed record PendingApproval(
+    string Id, string SessionId, string ToolName, string? Preview, string ToolInputJson,
+    JsonElement? Suggestions, DateTimeOffset Expires)
+{
+    public bool CanAlwaysAllow => Suggestions is { ValueKind: JsonValueKind.Array } s && s.GetArrayLength() > 0;
+}
+
+/// <summary>
+/// Holds PermissionRequest calls open until the widget decides. Resolve is an in-process call only:
+/// no HTTP route can set a decision.
+/// </summary>
+public sealed class ApprovalBroker
+{
+    readonly ConcurrentDictionary<string, (PendingApproval Item, TaskCompletionSource<(ApprovalChoice, string?)> Tcs)> _held = new();
+
+    /// <summary>Raised on a thread-pool thread whenever the pending set changes.</summary>
+    public event Action? Changed;
+
+    public IReadOnlyList<PendingApproval> Pending =>
+        _held.Values.Select(v => v.Item).OrderBy(p => p.Expires).ToList();
+
+    public bool Resolve(string id, ApprovalChoice choice, string? reason = null) =>
+        _held.TryGetValue(id, out var h) && h.Tcs.TrySetResult((choice, reason));
+
+    /// <summary>Returns null when the hold window expires or Claude Code drops the request.</summary>
+    internal async Task<(ApprovalChoice Choice, string? Reason)?> Hold(PendingApproval item, TimeSpan window, CancellationToken aborted)
+    {
+        var tcs = new TaskCompletionSource<(ApprovalChoice, string?)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _held[item.Id] = (item, tcs);
+        Changed?.Invoke();
+        try { return await tcs.Task.WaitAsync(window, aborted); }
+        catch (TimeoutException) { return null; }
+        catch (OperationCanceledException) { return null; }
+        finally
+        {
+            _held.TryRemove(item.Id, out _);
+            Changed?.Invoke();
+        }
+    }
+}

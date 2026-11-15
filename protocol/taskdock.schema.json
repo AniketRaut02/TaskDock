@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "taskdock.schema.json",
+  "title": "TaskDock hub protocol v1",
+  "description": "One JSON envelope for every WebSocket frame. Claude Code uses plain HTTP hooks instead (see the plan).",
+  "type": "object",
+  "required": ["v", "type", "seq", "ts", "body"],
+  "properties": {
+    "v": { "const": 1 },
+    "type": { "enum": ["hello", "welcome", "state", "heartbeat", "command", "result", "bye"] },
+    "seq": { "type": "integer", "minimum": 0 },
+    "ts": { "type": "integer", "description": "Unix ms" },
+    "src": {
+      "type": "object",
+      "required": ["adapter", "instance"],
+      "properties": { "adapter": { "type": "string" }, "instance": { "type": "string" } }
+    },
+    "body": { "type": "object" }
+  },
+  "allOf": [
+    { "if": { "properties": { "type": { "const": "hello" } } }, "then": { "properties": { "body": { "$ref": "#/$defs/hello" } } } },
+    { "if": { "properties": { "type": { "const": "welcome" } } }, "then": { "properties": { "body": { "$ref": "#/$defs/welcome" } } } },
+    { "if": { "properties": { "type": { "const": "state" } } }, "then": { "properties": { "body": { "$ref": "#/$defs/state" } } } },
+    { "if": { "properties": { "type": { "const": "command" } } }, "then": { "properties": { "body": { "$ref": "#/$defs/command" } } } },
+    { "if": { "properties": { "type": { "const": "result" } } }, "then": { "properties": { "body": { "$ref": "#/$defs/result" } } } },
+    { "if": { "properties": { "type": { "const": "bye" } } }, "then": { "properties": { "body": { "$ref": "#/$defs/bye" } } } }
+  ],
+  "$defs": {
+    "hello": {
+      "type": "object",
+      "required": ["adapter", "instance"],
+      "properties": {
+        "adapter": { "enum": ["unity", "vscode", "downloads", "generic"] },
+        "instance": { "type": "string", "description": "Stable across reconnects: unity pid+hash(projectPath), vscode folder+sessionId, chrome UUID" },
+        "version": { "type": "string" },
+        "pid": { "type": "integer" },
+        "match": { "type": "object", "additionalProperties": { "type": "string" }, "description": "projectPath / workspacePath / browser" },
+        "actions": { "type": "array", "items": { "type": "string" } },
+        "token": { "type": "string", "description": "Required unless the client is the allowlisted browser extension (Origin)" }
+      }
+    },
+    "welcome": {
+      "type": "object",
+      "required": ["heartbeatMs", "notifyEnabled"],
+      "properties": { "heartbeatMs": { "type": "integer" }, "notifyEnabled": { "type": "boolean" } }
+    },
+    "state": {
+      "type": "object",
+      "required": ["state", "label"],
+      "description": "Full snapshot, never a delta. 'state' is the adapter state text, e.g. 'Compile errors (2)'.",
+      "properties": {
+        "state": { "type": "string" },
+        "label": { "type": "string" },
+        "detail": { "type": "string" },
+        "progress": { "type": "number", "minimum": 0, "maximum": 1 },
+        "items": { "type": "array" }
+      }
+    },
+    "command": {
+      "type": "object",
+      "required": ["id", "action"],
+      "properties": { "id": { "type": "string" }, "action": { "type": "string" }, "args": {} }
+    },
+    "result": {
+      "type": "object",
+      "required": ["id", "ok"],
+      "properties": { "id": { "type": "string" }, "ok": { "type": "boolean" }, "error": { "type": "string" } }
+    },
+    "bye": { "type": "object", "properties": { "reason": { "type": "string" } } }
+  }
+}

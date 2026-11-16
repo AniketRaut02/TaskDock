@@ -236,7 +236,7 @@ public sealed class HubServer(HubOptions options, ChannelWriter<StateEvent> sink
                         c.Last = s with { Progress = s.Progress is { } pr ? Math.Clamp(pr, 0, 1) : null };
                         Publish(c);
                         break;
-                    case "heartbeat" when c.Adapter == "unity":
+                    case "heartbeat" when c.Adapter is "unity" or "visualstudio": // re-check hung / blocked on every beat
                         c.PulseAgeMs = f.Body<HeartbeatBody>()?.PulseAgeMs;
                         Publish(c);
                         break;
@@ -258,7 +258,7 @@ public sealed class HubServer(HubOptions options, ChannelWriter<StateEvent> sink
             _conns.TryRemove(new KeyValuePair<string, Connection>(c.Key, c));
         }
 
-        if (clean || c.Adapter != "unity")
+        if (clean || c.Adapter is not ("unity" or "visualstudio"))
         {
             Emit(c, "Offline", null, null); // bye: the tile goes Offline immediately
             if (clean) await Close(ws, WebSocketCloseStatus.NormalClosure, "bye");
@@ -266,7 +266,7 @@ public sealed class HubServer(HubOptions options, ChannelWriter<StateEvent> sink
         }
 
         // Unity goes silent during a domain reload: keep "Reloading" (with elapsed time) until the new hello arrives.
-        if (c.Last?.State.StartsWith("Reloading", StringComparison.OrdinalIgnoreCase) == true) { _ = WatchReload(c); return; }
+        if (c.Adapter == "unity" && c.Last?.State.StartsWith("Reloading", StringComparison.OrdinalIgnoreCase) == true) { _ = WatchReload(c); return; }
         await Task.Delay(300); // a killed editor drops the socket a moment before its process is gone
         Emit(c, c.Pid is { } pid && !options.IsAlive(pid) ? "Closed" : "Offline", null, null);
     }
@@ -279,6 +279,7 @@ public sealed class HubServer(HubOptions options, ChannelWriter<StateEvent> sink
     {
         if (c.Last is not { } s) return;
         string state = s.State, detail = s.Detail ?? "";
+        if (c.Adapter == "visualstudio" && c.Pid is { } vsPid && options.IsHung(vsPid)) state = "Not responding";
         if (c.Adapter == "unity")
         {
             var expectedSilence = s.State.StartsWith("Reloading", StringComparison.OrdinalIgnoreCase)

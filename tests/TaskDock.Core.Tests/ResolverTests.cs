@@ -30,6 +30,17 @@ public class ResolverTests
     }
 
     [Fact]
+    public void Visual_studio_with_extension_pins_the_solution_else_generic_with_hint()
+    {
+        var vs = T("visualstudio", "Starfall", 4242, ("solutionPath", @"D:\Projects\Starfall\Starfall.sln"));
+        var r = Resolver.Resolve(@"C:\VS\Common7\IDE\devenv.exe", "Starfall - Microsoft Visual Studio", 4242, [vs]);
+        Assert.Equal(("visualstudio", @"D:\Projects\Starfall\Starfall.sln"), (r.Pin.Adapter, r.Pin.Launch!["args"]![0]!.GetValue<string>()));
+        var g = Resolver.Resolve(@"C:\VS\Common7\IDE\devenv.exe", "x", 1, [vs]);
+        Assert.Equal(("generic", "devenv.exe"), (g.Pin.Adapter, g.Pin.Match["process"]));
+        Assert.NotNull(g.Hint);
+    }
+
+    [Fact]
     public void Vscode_matches_by_workspace_name_in_title()
     {
         var v = T("vscode", "Fatebound", null, ("workspacePath", "D:/Projects/Fatebound"));

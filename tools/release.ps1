@@ -2,6 +2,7 @@
 #   TaskDock.exe                       self-contained single file (no .NET install needed)
 #   com.darkpixelgd.taskdock-<v>.tgz   Unity package (Package Manager → Add package from tarball)
 #   taskdock-<v>.vsix                  VS Code extension (Install from VSIX)
+#   taskdock-visualstudio-<v>.vsix     Visual Studio 2022 / 2026 extension (double-click, or VSIXInstaller)
 #   taskdock-browser-extension.zip     unzip, then Load unpacked in Chrome / Edge / Brave
 # Run from anywhere: powershell -ExecutionPolicy Bypass -File tools/release.ps1
 $ErrorActionPreference = 'Stop'
@@ -41,6 +42,21 @@ Run 'VS Code extension' {
         if (!$LASTEXITCODE) { Move-Item -Force *.vsix $out }
     } finally { Pop-Location }
 }
+
+# The Visual Studio extension needs Visual Studio's own MSBuild (the VSSDK targets run on .NET Framework).
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+$msbuild = if (Test-Path $vswhere) { & $vswhere -latest -prerelease -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1 }
+if ($msbuild) {
+    Run 'Visual Studio extension' {
+        $proj = Join-Path $root 'adapters/visualstudio/TaskDock.VisualStudio.csproj'
+        # -nodeReuse:false: a lingering MSBuild node blocks VSIXInstaller ("processes need to be shut down").
+        & $msbuild $proj -restore -p:Configuration=Release -nodeReuse:false -v:minimal -nologo
+        if (!$LASTEXITCODE) {
+            $version = ([xml](Get-Content (Join-Path $root 'adapters/visualstudio/source.extension.vsixmanifest'))).PackageManifest.Metadata.Identity.Version
+            Copy-Item (Join-Path $root 'adapters/visualstudio/bin/Release/net48/TaskDock.VisualStudio.vsix') (Join-Path $out "taskdock-visualstudio-$version.vsix")
+        }
+    }
+} else { Write-Warning 'Visual Studio not found: skipping the Visual Studio extension.' }
 
 Run 'browser extension' {
     $ext = Join-Path $root 'adapters/chrome'

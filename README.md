@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>Everything your PC is working on, in one quiet corner of the screen.</b><br>
-  An always-on-top Windows widget for Claude Code, Unity, VS Code, browser downloads and whatever is playing.<br>
+  An always-on-top Windows widget for Claude Code, Unity, Visual Studio, VS Code, browser downloads and whatever is playing.<br>
   It tells you when something is done, when something failed, and when something is waiting for you.
 </p>
 
@@ -56,6 +56,7 @@ This installs the latest release for your user (no admin rights) and starts it:
 
 - `TaskDock.exe` goes to `%LOCALAPPDATA%\Programs\TaskDock`, with a Start menu shortcut.
 - The browser extension is unpacked next to it, ready for **Load unpacked**.
+- If Visual Studio 2022 or 2026 is installed, the installer offers to add the Visual Studio extension. Visual Studio's own installer window finishes it.
 - If VS Code's `code` command is available, the installer offers to add the VS Code extension too.
 
 Run the same line again to upgrade. Your settings, presets and connections are kept.
@@ -72,6 +73,7 @@ Each integration is optional, and each takes about a minute.
 |---|---|
 | **Claude Code** | Right-click the TaskDock tray icon → **Connect Claude Code**. Done. New sessions appear in the widget. |
 | **Unity** (2022.3+) | **Window → Package Manager → + → Add package from git URL**, then paste:<br>`https://github.com/AniketRaut02/TaskDock.git?path=/adapters/unity/com.darkpixelgd.taskdock`<br>Needs [Git](https://git-scm.com/download/win) installed. |
+| **Visual Studio** (2022, 2026) | Accept the installer's offer, or download `taskdock-visualstudio-0.1.0.vsix` from [Releases](https://github.com/AniketRaut02/TaskDock/releases/latest) and double-click it. Close Visual Studio first; it connects the next time you open it. |
 | **VS Code** (1.93+) | Accept the installer's offer, or download `taskdock-0.1.0.vsix` from [Releases](https://github.com/AniketRaut02/TaskDock/releases/latest) → Extensions view → **…** → **Install from VSIX…** |
 | **Chrome, Edge, Brave** | Open `chrome://extensions` (or `edge://extensions`, `brave://extensions`) → turn on **Developer mode** → **Load unpacked** → pick `%LOCALAPPDATA%\Programs\TaskDock\browser-extension` |
 | **Spotify, YouTube, any player** | Nothing to set up. The media bar uses Windows' own media controls. |
@@ -87,6 +89,7 @@ New sources never add themselves. They wait under **+N detected** in the header 
 |---|---|---|
 | **Claude Code** | Working · Needs approval · Needs input · Done · Failed, plus the tool it's running and how many subagents | **Allow**, **Always allow**, **Deny** with a reason Claude reads, or hand the decision back to the **Terminal** |
 | **Unity Editor** | Compiling · Reloading · Importing · Playing · Paused · Building · Compile errors (n) · Background task (%) · Main thread blocked · Not responding | **▶ Play**, **Pause**, **■ Stop**, **Focus** |
+| **Visual Studio** | Building · Build succeeded · Build failed (n of m projects) · Debugging · **Paused** at a breakpoint or exception · Not responding | **Focus** |
 | **VS Code** | Task running · Debugging · Command running (terminal commands longer than 10 s) · Succeeded · Failed (exit code) | **Focus** |
 | **Browser downloads** | Downloading (count, %, speed, time left) · Needs confirmation · Complete · Failed · Paused | **Pause**, **Resume**, **Cancel**, **Open**, **Show in folder** per file |
 | **Media bar** | Title, artist, cover art and progress of whatever Windows says is playing | Previous / play-pause / next, switch between players, pin one player, search Spotify or YouTube |
@@ -155,6 +158,7 @@ flowchart LR
     CC["Claude Code<br/>HTTP hooks"] -- "HTTP POST" --> HUB
     UN["Unity Editor<br/>package"] -- WebSocket --> HUB
     VS["VS Code<br/>extension"] -- WebSocket --> HUB
+    VSI["Visual Studio<br/>extension"] -- WebSocket --> HUB
     BR["Chrome · Edge · Brave<br/>extension"] -- WebSocket --> HUB
     subgraph TD["TaskDock.exe"]
         HUB["Local hub<br/>127.0.0.1 only"] --> REG["Tiles + rules"]
@@ -177,7 +181,7 @@ Every source reports to a small server inside TaskDock that only listens on your
 ## Requirements
 
 - Windows 10 (2004 or later) or Windows 11, 64-bit
-- Optional: Claude Code with HTTP hooks, Unity 2022.3 or 6, VS Code 1.93+, Chrome / Edge / Brave 116+
+- Optional: Claude Code with HTTP hooks, Unity 2022.3 or 6, Visual Studio 2022 or 2026, VS Code 1.93+, Chrome / Edge / Brave 116+
 
 ## Build from source
 
@@ -189,7 +193,7 @@ cd TaskDock
 powershell -ExecutionPolicy Bypass -File tools/release.ps1
 ```
 
-This runs every test, then builds all four release files into `artifacts/release`. To work on the app itself:
+This runs every test, then builds all release files into `artifacts/release`. The Visual Studio extension is built with Visual Studio's own MSBuild, so it's skipped on machines without Visual Studio. To work on the app itself:
 
 ```powershell
 dotnet run --project src/TaskDock.App
@@ -203,7 +207,7 @@ The architecture, test suites, verification results and open questions are in [d
 2. If you turned on **Start with Windows**, turn it off in Settings.
 3. Quit TaskDock from the tray, then delete `%LOCALAPPDATA%\Programs\TaskDock` and the **TaskDock** Start menu shortcut.
 4. Optional: delete `%APPDATA%\TaskDock` (settings, presets) and `%LOCALAPPDATA%\TaskDock` (logs).
-5. Remove the Unity package, VS Code extension and browser extension the usual way.
+5. Remove the Unity package, Visual Studio extension, VS Code extension and browser extension the usual way.
 
 ## FAQ
 

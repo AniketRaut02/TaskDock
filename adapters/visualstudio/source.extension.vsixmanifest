@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
+  <Metadata>
+    <Identity Id="TaskDock.VisualStudio.darkpixelgd" Version="0.1.0" Language="en-US" Publisher="DarkPixel GD" />
+    <DisplayName>TaskDock</DisplayName>
+    <Description xml:space="preserve">Shows Visual Studio's builds and debugging on the TaskDock desktop widget: building, build succeeded or failed, debugging, and paused at a breakpoint.</Description>
+    <MoreInfo>https://github.com/AniketRaut02/TaskDock</MoreInfo>
+    <License>LICENSE.txt</License>
+    <Icon>TaskDock.png</Icon>
+    <Tags>status, build, debug, widget</Tags>
+  </Metadata>
+  <Installation>
+    <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.0,19.0)">
+      <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
+  </Installation>
+  <Prerequisites>
+    <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" Version="[17.0,)" DisplayName="Visual Studio core editor" />
+  </Prerequisites>
+  <Assets>
+    <Asset Type="Microsoft.VisualStudio.VsPackage" d:Source="Project" d:ProjectName="%CurrentProject%" Path="|%CurrentProject%;PkgdefProjectOutputGroup|" />
+  </Assets>
+</PackageManifest>

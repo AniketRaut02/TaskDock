@@ -25,6 +25,11 @@ public static class Resolver
                     return new(Pin(u, Launch(imagePath, "-projectPath", project)));
                 return new(Generic(imagePath, exe), "Install the TaskDock Unity package to see compile, reload and play-mode state.");
 
+            case "devenv.exe":
+                if (tiles.FirstOrDefault(t => t.Adapter == "visualstudio" && t.Pid == pid) is { } vsTile)
+                    return new(Pin(vsTile, vsTile.Match.TryGetValue("solutionPath", out var sln) ? Launch(imagePath, sln) : Launch(imagePath)));
+                return new(Generic(imagePath, exe), "Install the TaskDock Visual Studio extension to see builds and debugging.");
+
             case "code.exe":
                 if (tiles.FirstOrDefault(t => t.Adapter == "vscode" && t.Label.Length > 0 && windowTitle.Contains(t.Label, StringComparison.OrdinalIgnoreCase)) is { } v
                     && v.Match.TryGetValue("workspacePath", out var ws))

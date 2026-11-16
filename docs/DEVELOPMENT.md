@@ -12,6 +12,7 @@ src/TaskDock.Platform/      Win32 + WinRT: windows, focus, hung check, media con
 src/TaskDock.App/           the WPF widget, tray, settings, Claude hooks installer
 adapters/unity/             Unity Editor package (com.darkpixelgd.taskdock)
 adapters/vscode/            VS Code extension (TypeScript, esbuild)
+adapters/visualstudio/      Visual Studio 2022 / 2026 extension (VSSDK, .NET Framework 4.8)
 adapters/chrome/            browser downloads extension (Manifest V3)
 tools/TaskDock.FakeAdapter/ replays adapter sessions for UI work, load and screenshots
 tools/release.ps1           builds every release artifact
@@ -71,6 +72,23 @@ Modes: `demo` (Unity, VS Code and downloads cycling through their states), `clau
 | Media bar (Phase 4): whatever Windows' media controls say is playing. Title, artist and thumbnail; previous / play-pause / next (greyed when the app doesn't offer them); a progress line; chips to switch sessions; a pin to stick to one app; Spotify / YouTube search (Enter searches where the music is playing). Using the controls makes the bar stick to that app | Checked with a silent test session: metadata 37–62 ms after a press, thumbnails from a real Brave/YouTube session. Search links are unit-tested but weren't opened; untested with Spotify |
 | Browser downloads extension (Phase 5, `adapters/chrome`): MV3, loads unpacked in Chrome, Edge and Brave. One tile per browser profile: Downloading (n, %) with speed and time left, Needs confirmation, Complete, Failed, Paused. An expandable file list with Pause / Resume / Cancel (sent to the browser) and Open / Show in folder (run by the widget). Sends file names, sizes, states and local paths, never URLs. A fixed key pins the extension ID; the hub accepts only that Origin | Checked in headless Edge 157: progress every second, 3 concurrent downloads, Cancel, Pause → Resume, one Complete sound per file, recovery after a browser restart and after the worker was killed. Not checked: a real network failure (Edge kept retrying, then called the partial file complete), Chrome, Brave |
 | VS Code extension (Phase 6, `adapters/vscode`): one tile per window. Failed (exit n) > Debugging > Task running > Command running > Succeeded > Idle, with the rest listed in the detail line. Terminal commands count only if they run at least `taskdock.longCommandSeconds` (10 s). `taskdock.notifyOnDebugEnd` (off) reports a finished debug session. Focus matches the window title against the workspace name | Unit-tested (11 Node tests). The bundled extension was run against the live hub with a stand-in for the VS Code API: task failure, ignored short command, long command → Succeeded, debugging, bye → Offline. **Not yet run inside a real VS Code** (none installed here) |
+
+## Visual Studio verification
+
+Checked in Visual Studio Community 2026 (18.12), extension installed with `VSIXInstaller`, driven through DTE on a one-project console solution:
+
+| Action | Tile |
+|---|---|
+| Open the solution | Idle (connected about 2 s after Visual Studio started) |
+| Clean, then build | Building → Build succeeded |
+| Build with a compile error | Building → Build failed (1 of 1 project) |
+| Debug (F5) | Building → Build succeeded → Debugging |
+| Breakpoint hit | Paused (Attention) |
+| Continue to the end | Idle |
+
+Hub tests cover Not responding (hung window) and Closed (process gone). Not yet checked in a real Visual Studio: Not responding on a real hang, Visual Studio 2022, Open Folder mode, and a solution switch while TaskDock is watching.
+
+Two traps found while testing: an MSBuild worker left behind by a build blocks `VSIXInstaller` (the release script now passes `-nodeReuse:false`), and anything started from inside a packaged app (like the Claude desktop app) gets a private AppData. That's why the installer opens both TaskDock and the Visual Studio installer through Explorer.
 
 ## Unity verification
 

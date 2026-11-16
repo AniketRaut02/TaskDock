@@ -5,6 +5,7 @@
 #   - TaskDock.exe            -> %LOCALAPPDATA%\Programs\TaskDock, plus a Start menu shortcut
 #   - browser extension       -> %LOCALAPPDATA%\Programs\TaskDock\browser-extension (for "Load unpacked")
 #   - VS Code extension       -> only if the `code` command exists and you say yes
+#   - Visual Studio extension -> only if Visual Studio 2022 / 2026 is installed and you say yes
 # Running it again upgrades in place. Settings, presets and Claude Code hooks are kept.
 
 $ErrorActionPreference = 'Stop'
@@ -45,10 +46,26 @@ $vscode = $false
 if (Get-Command code -ErrorAction SilentlyContinue) {
     $answer = Read-Host 'VS Code found. Install the TaskDock VS Code extension too? [Y/n]'
     if ($answer -notmatch '^(n|no)$') {
-        $vsix = Get-Asset 'taskdock-*.vsix' (Join-Path $env:TEMP 'taskdock.vsix')
+        $vsix = Get-Asset 'taskdock-[0-9]*.vsix' (Join-Path $env:TEMP 'taskdock.vsix')
         code --install-extension $vsix --force | Out-Null
         Remove-Item $vsix
         $vscode = $true
+    }
+}
+
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+$vsInstaller = if (Test-Path $vswhere) { & $vswhere -latest -prerelease -version '[17.0,19.0)' -find 'Common7\IDE\VSIXInstaller.exe' | Select-Object -First 1 }
+$visualStudio = 'not installed'
+if ($vsInstaller) {
+    $answer = Read-Host 'Visual Studio found. Install the TaskDock Visual Studio extension too? [Y/n]'
+    if ($answer -notmatch '^(n|no)$') {
+        $vsVsix = Get-Asset 'taskdock-visualstudio-*.vsix' (Join-Path $dir 'taskdock-visualstudio.vsix')
+        # Visual Studio's own installer window takes it from here (it asks you to close Visual Studio if needed).
+        # Opened through Explorer for the same reason as TaskDock below; the .cmd stays for a later rerun.
+        $cmd = Join-Path $dir 'install-visual-studio-extension.cmd'
+        Set-Content $cmd "@start `"`" `"$vsInstaller`" `"$vsVsix`"" -Encoding ascii
+        Start-Process explorer.exe -ArgumentList "`"$cmd`""
+        $visualStudio = 'opened'
     }
 }
 
@@ -66,4 +83,5 @@ Next steps (each one is optional):
   Browser       Open chrome://extensions (or edge:// / brave://), turn on Developer mode,
                 click Load unpacked and pick: $ext
 "@
+if ($visualStudio -eq 'opened') { Write-Host "  Visual Studio Finish in Visual Studio's installer window. To run it again: $dir\install-visual-studio-extension.cmd" }
 if (-not $vscode) { Write-Host "  VS Code       Rerun this installer once the 'code' command is available, or install the .vsix from the release page." }

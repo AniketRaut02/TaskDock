@@ -320,6 +320,25 @@ public sealed class HubTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Visual_studio_hung_is_not_responding_and_killed_is_closed()
+    {
+        var ws = await Connect();
+        await Send(ws, "hello", new HelloBody("visualstudio", "vs:1", Pid: 5151, Match: new() { ["solutionPath"] = "D:/p/p.sln" }, Token: _hub.Token));
+        await Read(ws);
+        await Send(ws, "state", new StateBody("Building", "p"));
+        Assert.Equal("Building", (await Next()).State);
+        _hung = true;
+        await Send(ws, "heartbeat", new { });
+        Assert.Equal("Not responding", (await Next()).State);
+        _hung = false;
+        await Send(ws, "heartbeat", new { });
+        Assert.Equal("Building", (await Next()).State);
+        _alive = false;
+        ws.Abort();
+        Assert.Equal("Closed", (await Next()).State);
+    }
+
+    [Fact]
     public async Task Unity_process_dying_mid_reload_is_closed()
     {
         var ws = await Unity("Reloading");

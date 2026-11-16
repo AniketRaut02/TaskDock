@@ -206,6 +206,8 @@ public sealed partial class MainViewModel : ObservableObject
             "vscode" when t.Match.TryGetValue("workspacePath", out var ws) => Cmd("code", ws),
             "unity" when t.Match.TryGetValue("projectPath", out var pp) && t.Pid is { } pid && Platform.Desktop.ImagePath(pid) is { } exe
                 => Cmd(exe, "-projectPath", pp),
+            "visualstudio" when t.Match.TryGetValue("solutionPath", out var sln) && t.Pid is { } vsPid && Platform.Desktop.ImagePath(vsPid) is { } devenv
+                => Cmd(devenv, sln),
             _ => null,
         };
     }

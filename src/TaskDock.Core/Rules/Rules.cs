@@ -33,6 +33,12 @@ public static class Rules
             ["Task running"] = StatusClass.Busy, ["Command running"] = StatusClass.Busy, ["Idle"] = StatusClass.Idle,
             ["Closed"] = StatusClass.Offline,
         },
+        ["visualstudio"] = new(Cmp)
+        {
+            ["Idle"] = StatusClass.Idle, ["Building"] = StatusClass.Busy, ["Build succeeded"] = StatusClass.Done,
+            ["Build failed"] = StatusClass.Error, ["Debugging"] = StatusClass.Busy, ["Paused"] = StatusClass.Attention,
+            ["Not responding"] = StatusClass.Error, ["Closed"] = StatusClass.Offline,
+        },
         ["generic"] = new(Cmp)
         {
             ["Running"] = StatusClass.Idle, ["Not responding"] = StatusClass.Error, ["Closed"] = StatusClass.Offline,

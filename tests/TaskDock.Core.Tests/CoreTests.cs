@@ -70,6 +70,9 @@ public class RulesAndRegistryTests
     [InlineData("downloads", "Downloading (2, 45%)", StatusClass.Busy)]
     [InlineData("claude", "Needs approval", StatusClass.Attention)]
     [InlineData("unity", "Offline", StatusClass.Offline)]
+    [InlineData("visualstudio", "Build failed (2 projects)", StatusClass.Error)]
+    [InlineData("visualstudio", "Paused", StatusClass.Attention)]
+    [InlineData("visualstudio", "Build succeeded", StatusClass.Done)]
     [InlineData("nobody", "whatever", StatusClass.Idle)]
     public void Classify(string adapter, string state, StatusClass expected) =>
         Assert.Equal(expected, Rules.Rules.Classify(adapter, state));

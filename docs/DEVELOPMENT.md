@@ -118,10 +118,21 @@ Unity's update tick is throttled while the Editor is in the background. If "Main
 
 The hub follows the hooks docs: an empty 200 means no decision, an HTTP failure is non-blocking, and the PermissionRequest hook timeout is set to the hold window + 10 s. Four things are still open and need a real interactive session to settle:
 
-1. Does the terminal prompt show while the PermissionRequest hook is pending? If not, set `holdSeconds` to about 20 (see Risks in the plan).
-2. Does an empty 200 really leave the normal prompt in place?
-3. What happens if the hook timeout fires mid-hold?
+1. ~~Does the terminal prompt show while the PermissionRequest hook is pending?~~ Yes (S1 below).
+2. ~~Does an empty 200 really leave the normal prompt in place?~~ Yes (S1).
+3. ~~What happens if the hook timeout fires mid-hold?~~ The request closes silently; the prompt stays (S1).
 4. Which hooks fire inside the VS Code extension, compared with the CLI?
+
+### Remote (0.2.0) Phase 0 spikes
+
+| # | Status | Result |
+| --- | --- | --- |
+| S1 | **Pass**, with one plan change | Claude Code 2.1.325 CLI, HTTP hook, 300 s hold. (1) The normal Allow/Deny prompt shows in the terminal at the same time as the held hook. (2) An empty 200 after 300 s leaves that prompt in place; nothing runs. (3) A hook timeout mid-hold (60 s) closes the request with no visible error; the prompt stays. (4) **Answering in the terminal mid-hold runs the tool at once but does not close the hook request**: it stays open until the hub answers. So the hub cannot learn from the socket that an approval was answered; it must clear the pending approval on the session's next hook event (PreToolUse, Stop, or a PostToolUse hook added for this), or the widget and phone keep showing it until the hold ends. Not tested: what a late Allow from the hub does after the terminal answer |
+| S2 | Skipped | Not tested; the plan follows the hooks docs (hooks snapshotted at session start). Settings tells users to restart running sessions after the hold changes, which is right either way |
+| S3 | **Pass** (reboot check open) | Tailscale 1.104.7, non-admin shell. `serve --bg --https=443 http://127.0.0.1:47830` and `serve --https=443 off` both exit 0 without elevation; `serve status --json` gives `Web["<name>:443"].Handlers["/"].Proxy`. `status --json` fields: `BackendState` (`Running`; `NeedsLogin` with `Health` "Tailscale is stopped." when signed out), `Self.DNSName` (trailing dot), `CertDomains` (empty until HTTPS certs are on), `MagicDNSSuffix`, `CurrentTailnet.MagicDNSEnabled`, login at `User[Self.UserID].LoginName`. Proxied requests carry `Tailscale-User-Login`, `-User-Name`, `-User-Profile-Pic`, `X-Forwarded-For/Host/Proto`, and `Host` = the bare ts.net name (no port). A client-sent `Tailscale-User-Login` is replaced with the real one. Identity headers are added even for requests from the PC itself. Fixtures need personal data scrubbed before going into tests |
+| S4 | **Pass** | Android, Chrome, installed PWA over the tailnet via `tailscale serve`. (1) Installs as a standalone app. (2) Passkey create and get with RP ID = the full `ts.net` name, platform authenticator, user verified flag set; `signCount` is always 0 (Google Password Manager), so the counter check must stay optional. (3) Web Push via `Lib.Net.Http.WebPush` 3.3.1 with VAPID reaches the locked phone in 0.2–0.4 s (PC clock, send to service-worker report). (4) The notification shows Deny and Open, but only after the user expands it on the lock screen. (5) Deny's `fetch` from `notificationclick` reaches the PC while the phone is locked. Setup gotchas for the wizard and docs: notifications must be on for Chrome in Android settings and for the site, otherwise `requestPermission` returns `denied` with no prompt; subscribe takes about 3 s, so the app must wait for it |
+| S5 | **Pass** | `PrintWindow(PW_RENDERFULLCONTENT)` gives a real image for Unity 6.5 (DX12, Game view included), Visual Studio 2026, Chrome and Electron (Claude desktop; VS Code is Electron too but was not installed), including windows fully covered by others, and **also with the PC locked** (captured 9 s after `LockWorkStation`). Minimized windows give a 159×27 title-bar stub: keep the 409 `minimized` check, and keep the `blank` check for cases not seen here (sleep, a disconnected display). The capturing process must be per-monitor DPI aware, or `GetWindowRect` is scaled and the image is cropped (1550×830 instead of 1938×1038 at 125%). Windows.Graphics.Capture fallback not needed |
+| S6 | **Pass** | A second idle `CreateSlimBuilder` Kestrel app adds 1.3–2.3 MB private memory (3 runs, 1 app 14.8–15.0 MB vs 2 apps 16.1–17.3 MB, framework-dependent build). Budget 10 MB: keep `RemoteServer` as its own app |
 
 ## Soak
 

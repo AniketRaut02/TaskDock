@@ -45,6 +45,17 @@ public static class PresetMatcher
     }
 
     /// <summary>A pin built from a live tile: every match key it reported.</summary>
+    /// <summary>
+    /// The tiles a pin shows. A relaunched app is a new tile (new PID), so the closed one is dropped once a match runs
+    /// again; while nothing runs, only the most recent closed match shows (with its Launch button).
+    /// </summary>
+    public static List<Tile> Bound(PresetTile pin, IEnumerable<Tile> tiles)
+    {
+        var matches = tiles.Where(t => Matches(pin, t)).ToList();
+        var running = matches.Where(t => t.Class != StatusClass.Offline).OrderBy(t => t.ConnectedAt).ToList();
+        return running.Count > 0 ? running : matches.OrderByDescending(t => t.UpdatedAt).Take(1).ToList();
+    }
+
     public static PresetTile PinFor(Tile t, bool notify = false) => new()
     {
         Adapter = t.Adapter, Notify = notify, Match = new Dictionary<string, string>(t.Match),

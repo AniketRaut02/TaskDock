@@ -185,6 +185,38 @@ public class PresetTests
         Assert.Equal(match, PresetMatcher.Matches(pin, tile));
     }
 
+    static Tile Unity(int pid, StatusClass c, int updatedSecs) => new()
+    {
+        Adapter = "unity", Instance = $"unity:{pid}:abc", Class = c, ConnectedAt = DateTimeOffset.UnixEpoch.AddSeconds(updatedSecs),
+        UpdatedAt = DateTimeOffset.UnixEpoch.AddSeconds(updatedSecs), Match = new Dictionary<string, string> { ["projectPath"] = "D:/p" },
+    };
+    static readonly PresetTile UnityPin = new() { Adapter = "unity", Match = new() { ["projectPath"] = "D:/p" } };
+
+    [Fact]
+    public void Relaunched_app_shows_once_not_next_to_its_closed_tile()
+    {
+        var closed = Unity(100, StatusClass.Offline, 10);
+        var relaunched = Unity(200, StatusClass.Idle, 20);
+        Assert.Equal([relaunched], PresetMatcher.Bound(UnityPin, [closed, relaunched]));
+    }
+
+    [Fact]
+    public void While_closed_only_the_latest_closed_tile_shows()
+    {
+        var first = Unity(100, StatusClass.Offline, 10);
+        var second = Unity(200, StatusClass.Offline, 30);
+        Assert.Equal([second], PresetMatcher.Bound(UnityPin, [first, second]));
+        Assert.Empty(PresetMatcher.Bound(UnityPin, []));
+    }
+
+    [Fact]
+    public void Two_running_editors_of_one_project_both_show()
+    {
+        var a = Unity(100, StatusClass.Busy, 10);
+        var b = Unity(200, StatusClass.Idle, 20);
+        Assert.Equal([a, b], PresetMatcher.Bound(UnityPin, [b, Unity(50, StatusClass.Offline, 5), a]));
+    }
+
     [Fact]
     public void Adapter_must_match_and_empty_matchers_never_bind()
     {

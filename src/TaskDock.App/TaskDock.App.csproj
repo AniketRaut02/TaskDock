@@ -8,7 +8,7 @@
     <AssemblyName>TaskDock</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\TaskDock.ico</ApplicationIcon>
-    <Version>0.1.3</Version>
+    <Version>0.1.4</Version>
     <Product>TaskDock</Product>
     <Copyright>© 2026 Aniket Raut (DarkPixel GD). MIT License.</Copyright>
   </PropertyGroup>

@@ -105,7 +105,7 @@ public sealed partial class MainViewModel : ObservableObject
         for (var i = 0; i < Preset.Tiles.Count; i++)
         {
             var pin = Preset.Tiles[i];
-            var live = Registry.Tiles.Where(t => PresetMatcher.Matches(pin, t)).OrderBy(t => t.ConnectedAt).ToList();
+            var live = PresetMatcher.Bound(pin, Registry.Tiles);
             if (live.Count == 0) desired.Add(Vm("pin:" + i).Update(null, pin, null));
             foreach (var t in live.Where(t => bound.Add(t.Key)))
                 desired.Add(Vm(t.Key).Update(t, pin, t.Adapter == "claude" ? pending[t.Instance].ToList() : null));

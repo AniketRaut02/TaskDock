@@ -134,6 +134,15 @@ The hub follows the hooks docs: an empty 200 means no decision, an HTTP failure 
 | S5 | **Pass** | `PrintWindow(PW_RENDERFULLCONTENT)` gives a real image for Unity 6.5 (DX12, Game view included), Visual Studio 2026, Chrome and Electron (Claude desktop; VS Code is Electron too but was not installed), including windows fully covered by others, and **also with the PC locked** (captured 9 s after `LockWorkStation`). Minimized windows give a 159×27 title-bar stub: keep the 409 `minimized` check, and keep the `blank` check for cases not seen here (sleep, a disconnected display). The capturing process must be per-monitor DPI aware, or `GetWindowRect` is scaled and the image is cropped (1550×830 instead of 1938×1038 at 125%). Windows.Graphics.Capture fallback not needed |
 | S6 | **Pass** | A second idle `CreateSlimBuilder` Kestrel app adds 1.3–2.3 MB private memory (3 runs, 1 app 14.8–15.0 MB vs 2 apps 16.1–17.3 MB, framework-dependent build). Budget 10 MB: keep `RemoteServer` as its own app |
 
+## Remote (0.2.0) gates
+
+- **Phase 1, 16 Nov 2026: pass.** 204 tests. Release builds of 0.1.4 and this branch render the widget identically under FakeAdapter `showcase` and `claude`; idle memory 53.4 vs 52.3 MB (3 runs each).
+- **Phase 2, 16 Nov 2026: pass**, on an Android phone in Chrome over the tailnet. Pairing from the QR code (passkey, then Allow on the PC); tiles follow the widget within about a second under FakeAdapter `demo`; airplane mode on and off reconnects by itself; a TaskDock restart brings Remote back and the phone resyncs; Revoke empties `devices.json` and the phone shows "unpaired" at once. Memory 150 s after start: 53.8 MB with Remote on and one phone connected, 57.4 MB with Remote off (noise is about ±4 MB). Shell 5.4 KB gzipped.
+  - Seen: after the restart the phone took about 2 minutes to reconnect (backoff at 30 s, or the app was in the background). Phase 3: reconnect on the browser's `online` event and when TaskDock's port answers again.
+  - Not checked: whether `tailscale serve` survives a reboot (Remote re-points it at startup either way).
+
+Run the remote tests with `dotnet test` (TaskDock.Remote.Tests) and `npm test` in `remote-web`. `npm run build` there writes `remote-web/dist`, which TaskDock.Remote embeds; without it the server serves a page saying the app wasn't built.
+
 ## Soak
 
 Run against the release `.exe` with `TaskDock.FakeAdapter` (private working set, the number Task Manager shows):

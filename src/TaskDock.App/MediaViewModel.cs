@@ -32,6 +32,7 @@ public sealed partial class MediaViewModel : ObservableObject
     [ObservableProperty] private string _title = "";
     [ObservableProperty] private string _artist = "";
     [ObservableProperty] private ImageSource? _thumb;
+    [ObservableProperty] private ImageSource? _appIcon;
     [ObservableProperty] private bool _playing;
     [ObservableProperty] private bool _canPrevious;
     [ObservableProperty] private bool _canToggle;
@@ -90,6 +91,7 @@ public sealed partial class MediaViewModel : ObservableObject
 
         Title = _info.Title.Length > 0 ? _info.Title : MediaSearch.FriendlyName(_info.AppId);
         Artist = _info.Artist;
+        AppIcon = AppIcons.ForMediaApp(_info.AppId); // Spotify's icon, or the browser's for YouTube
         Playing = _info.Playing;
         (CanPrevious, CanToggle, CanNext) = (_info.CanPrevious, _info.CanToggle, _info.CanNext);
         IsPinned = pinned == _info.AppId;

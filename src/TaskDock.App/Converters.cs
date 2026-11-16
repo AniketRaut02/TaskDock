@@ -15,6 +15,7 @@ public sealed class VisConverter : IValueConverter
         "NotNull" => value is null or "" ? Visibility.Collapsed : Visibility.Visible,
         "NotZero" => value is 0 ? Visibility.Collapsed : Visibility.Visible,
         "Empty" => string.IsNullOrEmpty(value as string) ? Visibility.Visible : Visibility.Collapsed,
+        "Null" => value is null ? Visibility.Visible : Visibility.Collapsed,
         "PinColor" => value is true ? Amber : Grey,
         "ChipBg" => value is true ? Blue : Chip,
         _ => throw new InvalidOperationException(Kind),

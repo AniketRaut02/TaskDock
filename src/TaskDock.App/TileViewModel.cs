@@ -16,6 +16,9 @@ public sealed partial class TileViewModel(MainViewModel owner, string key) : Obs
     PresetTile? _pin;
 
     public string Key { get; } = key;
+    /// <summary>The source program's own icon (null until found: the glyph shows meanwhile).</summary>
+    [ObservableProperty] private System.Windows.Media.ImageSource? _appIcon;
+    [ObservableProperty] private string _glyph = "";
     internal Tile? Tile => _tile;
     internal PresetTile? PinTile => _pin;
 
@@ -86,6 +89,8 @@ public sealed partial class TileViewModel(MainViewModel owner, string key) : Obs
             PauseText = t.State == "Paused" ? "Resume" : "Pause";
         }
         ClassBrush = Palette.Of(Class);
+        Glyph = AppIcons.GlyphFor(t?.Adapter ?? pin!.Adapter);
+        if (AppIcon == null && t != null) AppIcon = AppIcons.ForTile(t); // retried until the program is found, then kept
 
         var first = approvals?.FirstOrDefault();
         if (first == null) Approval = null;

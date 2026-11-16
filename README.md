@@ -132,6 +132,8 @@ Press **Ctrl+Alt+Shift+D** (or the button in the header) to cycle between them:
 
 Amber and red tiles float to the top. A green tile turns grey once you hover over it.
 
+Each tile shows the icon of the app it comes from (Unity, Visual Studio, your browser…), so two tiles with the same project name are easy to tell apart. The media bar shows the playing app's icon too; YouTube shows your browser's icon, since that's where it plays.
+
 ### Pin, notify, arrange
 
 - **Pin** a detected source with its pin button. A pinned tile remembers its project, folder or app, so it comes back when you reopen that project tomorrow, even though the session ID changes.

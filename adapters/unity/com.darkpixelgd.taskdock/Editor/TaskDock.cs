@@ -221,7 +221,8 @@ namespace TaskDock.Unity
             keywords = new[] { "TaskDock", "widget", "hub" },
             guiHandler = _ =>
             {
-                EditorGUILayout.LabelField("Status", HubClient.Connected ? "Connected to the TaskDock widget" : "Not connected (is TaskDock running?)");
+                EditorGUILayout.LabelField("Status", HubClient.Connected ? "Connected to the TaskDock widget" : "Not connected");
+                if (!HubClient.Connected && HubClient.LastError != null) EditorGUILayout.HelpBox(HubClient.LastError, MessageType.Warning);
                 EditorGUI.BeginChangeCheck();
                 var enabled = EditorGUILayout.Toggle("Enabled", Enabled);
                 var port = EditorGUILayout.IntField(new GUIContent("Port override", "0 = read the port from hub.json"), PortOverride);

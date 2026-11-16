@@ -24,7 +24,7 @@ Write-Host "Installing TaskDock $($release.tag_name) to $dir" -ForegroundColor C
 New-Item -ItemType Directory -Force $dir | Out-Null
 
 # An upgrade can't overwrite the running exe, and TaskDock allows one instance: stop any copy first.
-Get-Process TaskDock -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process TaskDock -ErrorAction SilentlyContinue | Stop-Process -Force -PassThru | Wait-Process -Timeout 15 -ErrorAction SilentlyContinue # the exe stays locked until it has fully exited
 $exe = Get-Asset 'TaskDock.exe' (Join-Path $dir 'TaskDock.exe')
 Unblock-File $exe
 
@@ -52,7 +52,9 @@ if (Get-Command code -ErrorAction SilentlyContinue) {
     }
 }
 
-Start-Process $exe
+# Launch through Explorer, not as our child: when this script runs inside a packaged app (e.g. a terminal in the
+# Claude desktop app), children inherit its private AppData, and Unity / VS Code would never find hub.json.
+Start-Process explorer.exe -ArgumentList "`"$exe`""
 
 Write-Host "`nTaskDock is running. Look for its icon in the tray." -ForegroundColor Green
 Write-Host @"

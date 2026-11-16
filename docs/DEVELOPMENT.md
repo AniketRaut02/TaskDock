@@ -82,7 +82,10 @@ Checked against Unity 6000.5.8f1 running in batch mode (a test driver edited scr
 - ▶ Play, Pause and ■ Stop on the tile drove play mode. The play-mode episode made no sound.
 - Killing the Editor showed Closed after 0.6 s.
 - Unity 6's asset-import worker processes are skipped, so each Editor shows up as one tile.
-- Not yet checked: an Editor with a window (Focus, Not responding on a real hang), Unity 2022.3, Building, and background tasks with progress.
+- In a real windowed Editor (6000.5.8f1, a project with other Editor packages, the package embedded): the tile followed Idle → Reloading (with elapsed seconds) → Importing → Playing, and ▶ Play / ■ Stop on the tile drove play mode. Killing and reinstalling TaskDock made Unity log the outage and reconnect by itself.
+- Once, Unity re-entered play mode about a second after Stop. A second clean Play/Stop cycle didn't repeat it, and TaskDock never re-sends commands. Cause unknown.
+- Found while testing: a TaskDock started from inside a packaged (MSIX) app writes `hub.json` into that app's private AppData, so a Unity started from Unity Hub never finds it. The installer now launches TaskDock through Explorer, and the package logs `[TaskDock]` connect and failure reasons to the Console (they were silent before).
+- Not yet checked: Focus and Not responding on a real hang, Unity 2022.3, Building, and background tasks with progress.
 
 Unity's update tick is throttled while the Editor is in the background. If "Main thread blocked" flickers while Unity is idle and unfocused, raise `UnityBlockedAfter` in `HubOptions` (default 5 s).
 

@@ -28,6 +28,18 @@ namespace TaskDock.Unity
         static int _portOverride;
 
         public static bool Connected => _ws != null && _ws.State == WebSocketState.Open;
+        /// <summary>Why the last attempt failed, for the Preferences page; null once connected.</summary>
+        public static string LastError { get; private set; }
+        static string _logged; // log each distinct failure once, not every retry
+
+        /// <summary>Debug.Log is thread-safe; this thread never touches other Unity APIs.</summary>
+        static void Fail(string why)
+        {
+            LastError = why;
+            if (why == _logged) return;
+            _logged = why;
+            UnityEngine.Debug.LogWarning("[TaskDock] Can't reach the TaskDock widget: " + why + " Retrying every few seconds.");
+        }
         public static string Instance => _instance;
 
         /// <summary>Raised on the socket thread; CommandDispatcher moves it to the main thread.</summary>
@@ -86,7 +98,7 @@ namespace TaskDock.Unity
             while (!_stop)
             {
                 try { Session(); backoff = 1000; }
-                catch (Exception) { /* hub not running, closed, or refused: retry below */ }
+                catch (Exception e) { Fail(e.GetBaseException().GetType().Name + ": " + e.GetBaseException().Message); }
                 _ws = null;
                 if (_stop) break;
                 Wake.WaitOne(backoff);
@@ -96,22 +108,25 @@ namespace TaskDock.Unity
 
         static void Session()
         {
-            var hub = Wire.ReadHub();
-            if (hub == null) return;
+            var hub = Wire.ReadHub(out var error);
+            if (hub == null) { Fail(error); return; }
             var port = _portOverride > 0 ? _portOverride : hub.Value.Port;
 
             using (var ws = new ClientWebSocket())
             {
-                if (!ws.ConnectAsync(new Uri($"ws://127.0.0.1:{port}/ws"), CancellationToken.None).Wait(3000)) return;
+                if (!ws.ConnectAsync(new Uri($"ws://127.0.0.1:{port}/ws"), CancellationToken.None).Wait(3000)) { Fail($"no answer on port {port} within 3 s."); return; }
                 var hello = (JObject)_hello.DeepClone();
                 hello["token"] = hub.Value.Token;
                 Send(ws, Wire.Frame("hello", _instance, hello), 2000);
 
                 var welcome = Receive(ws, 3000);
-                if (welcome == null || (string)welcome["type"] != "welcome") return;
+                if (welcome == null || (string)welcome["type"] != "welcome") { Fail("the widget refused the hello (token changed? reconnecting)."); return; }
                 var heartbeatMs = (int?)welcome["body"]?["heartbeatMs"] ?? 1000;
 
                 _ws = ws;
+                if (_logged != "connected") UnityEngine.Debug.Log($"[TaskDock] Connected to the TaskDock widget on port {port}.");
+                LastError = null;
+                _logged = "connected";
                 if (_lastState != null) Send(ws, _lastState, 2000); // full snapshot after every (re)connect
                 while (Outbox.TryDequeue(out _)) { } // anything queued while offline is older than that snapshot
 

@@ -216,6 +216,9 @@ It carries its own .NET runtime, so you don't have to install one, and it's left
 **An approval card disappeared and the terminal asked me instead. Why?**
 An approval waits in the widget for 120 seconds by default (Settings → Approval hold). After that Claude Code's normal terminal prompt takes over, so nothing is ever stuck.
 
+**Unity (or VS Code) says it can't reach TaskDock and `hub.json` is not found, but TaskDock is running.**
+That TaskDock was probably started from inside a packaged app, such as a terminal in the Claude desktop app. Windows then gives it a private copy of AppData that other apps can't see. Quit it from the tray and start TaskDock from the Start menu. The installer already launches it this way. Unity's Console logs one `[TaskDock]` line when it connects, and one per reason it can't.
+
 **Firefox? macOS? Linux?**
 Not in v1. TaskDock is Windows-only, and the downloads extension supports Chromium browsers only.
 

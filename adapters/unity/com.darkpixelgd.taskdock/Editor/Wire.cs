@@ -39,17 +39,18 @@ namespace TaskDock.Unity
 
         public static string NormalizePath(string p) => p.Replace('\\', '/').TrimEnd('/');
 
-        /// <summary>%LOCALAPPDATA%\TaskDock\hub.json → (port, token), or null while the widget isn't running.</summary>
-        public static (int Port, string Token)? ReadHub()
+        /// <summary>%LOCALAPPDATA%\TaskDock\hub.json → (port, token), or null with the reason while the widget isn't reachable.</summary>
+        public static (int Port, string Token)? ReadHub(out string error)
         {
+            var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TaskDock", "hub.json");
             try
             {
-                var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TaskDock", "hub.json");
-                if (!File.Exists(path)) return null;
+                if (!File.Exists(path)) { error = $"{path} not found (is TaskDock running?)"; return null; }
                 var j = JObject.Parse(File.ReadAllText(path));
+                error = null;
                 return ((int)j["port"], (string)j["token"]);
             }
-            catch (Exception) { return null; } // half-written or corrupt: try again next round
+            catch (Exception e) { error = $"couldn't read {path}: {e.GetBaseException().Message}"; return null; } // half-written: retried
         }
     }
 

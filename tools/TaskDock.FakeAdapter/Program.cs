@@ -2,9 +2,11 @@
 //   fake demo     unity + vscode + downloads tiles cycling through their states
 //   fake claude   one Claude Code session over HTTP hooks, including a held PermissionRequest
 //   fake load     8 adapters at 10 updates/s each (Phase 1 CPU acceptance check)
+//   fake showcase steady, realistic states for screenshots (Unity compiling, VS Code failed, Chrome downloading)
 using System.Net.Http.Json;
 using System.Net.WebSockets;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using TaskDock.Core.Protocol;
 
@@ -21,13 +23,28 @@ using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(seconds));
 switch (mode)
 {
     case "claude": await Claude(); break;
+    case "showcase":
+        var files = JsonSerializer.SerializeToElement(new object[]
+        {
+            new { id = 1, file = "starfall-assets-v3.zip", path = @"C:\Users\Public\Downloads\starfall-assets-v3.zip", state = "in_progress", bytes = 640_000_000, total = 1_000_000_000, speed = 12_400_000 },
+            new { id = 2, file = "unity-6000.5.8f1.exe", path = @"C:\Users\Public\Downloads\unity-6000.5.8f1.exe", state = "in_progress", bytes = 210_000_000, total = 420_000_000, speed = 9_100_000 },
+            new { id = 3, file = "soundtrack-stems.zip", path = @"C:\Users\Public\Downloads\soundtrack-stems.zip", state = "complete", bytes = 88_000_000, total = 88_000_000 },
+        });
+        await Task.WhenAll(
+            Adapter("unity", "unity:1:fake", new() { ["projectPath"] = "D:/Projects/Starfall" }, "Starfall",
+                [("Compiling", "Assets/Scripts/Player/PlayerController.cs", null)]),
+            Adapter("vscode", "vscode:fake", new() { ["workspacePath"] = "D:/Projects/starfall-web" }, "starfall-web",
+                [("Failed (exit 1)", "npm run build exited with 1", null)]),
+            Adapter("downloads", "chrome:fake", new() { ["browser"] = "chrome" }, "Chrome downloads",
+                [("Downloading (2, 59%)", "starfall-assets-v3.zip · 11.8 MB/s · 31 s left · +1 more", 0.59)], files));
+        break;
     case "load": await Task.WhenAll(Enumerable.Range(1, 8).Select(i => Load(i))); break;
     default:
         await Task.WhenAll(
-            Adapter("unity", "unity:1:fake", new() { ["projectPath"] = "D:/Projects/Fatebound" }, "Fatebound",
+            Adapter("unity", "unity:1:fake", new() { ["projectPath"] = "D:/Projects/Starfall" }, "Starfall",
                 [("Idle", null, null), ("Compiling", null, null), ("Reloading", null, null), ("Importing", "Textures", 0.4),
                  ("Compile errors (2)", "Assets/Player.cs(12): CS1002", null), ("Playing", null, null), ("Idle", null, null)]),
-            Adapter("vscode", "vscode:fake", new() { ["workspacePath"] = "D:/Projects/Fatebound" }, "Fatebound",
+            Adapter("vscode", "vscode:fake", new() { ["workspacePath"] = "D:/Projects/Starfall" }, "Starfall",
                 [("Idle", null, null), ("Command running", "npm install", null), ("Succeeded", "npm install · 42 s", null),
                  ("Task running", "build", null), ("Failed (exit 1)", "build exited with 1", null)]),
             Adapter("downloads", "chrome:fake", new() { ["browser"] = "chrome" }, "Chrome downloads",
@@ -37,7 +54,7 @@ switch (mode)
 }
 return 0;
 
-async Task Adapter(string adapter, string instance, Dictionary<string, string> match, string label, (string State, string? Detail, double? Progress)[] script)
+async Task Adapter(string adapter, string instance, Dictionary<string, string> match, string label, (string State, string? Detail, double? Progress)[] script, JsonElement? items = null)
 {
     using var ws = await Connect(adapter, instance, match);
     var i = 0;
@@ -46,7 +63,7 @@ async Task Adapter(string adapter, string instance, Dictionary<string, string> m
         while (!stop.IsCancellationRequested)
         {
             var (state, detail, progress) = script[i++ % script.Length];
-            await Send(ws, "state", new StateBody(state, label, detail, progress));
+            await Send(ws, "state", new StateBody(state, label, detail, progress, items));
             Console.WriteLine($"{adapter,-10} {state}");
             await Task.Delay(TimeSpan.FromSeconds(3), stop.Token);
         }
@@ -80,7 +97,8 @@ async Task<ClientWebSocket> Connect(string adapter, string instance, Dictionary<
     var buf = new byte[4096];
     var r = await ws.ReceiveAsync(buf, CancellationToken.None);
     if (r.MessageType == WebSocketMessageType.Close) throw new InvalidOperationException($"hub refused {adapter}: {ws.CloseStatusDescription}");
-    _ = Task.Run(async () => // heartbeats every 5 s, and answer commands
+    var beatMs = Wire.Parse(Encoding.UTF8.GetString(buf, 0, r.Count))?.Body<WelcomeBody>()?.HeartbeatMs ?? 5000; // Unity gets 1 s
+    _ = Task.Run(async () => // answer commands
     {
         try
         {
@@ -100,7 +118,7 @@ async Task<ClientWebSocket> Connect(string adapter, string instance, Dictionary<
     });
     _ = Task.Run(async () =>
     {
-        while (ws.State == WebSocketState.Open) { await Task.Delay(4000); try { await Send(ws, "heartbeat", new { }); } catch { return; } }
+        while (ws.State == WebSocketState.Open) { await Task.Delay(beatMs * 4 / 5); try { await Send(ws, "heartbeat", new { }); } catch { return; } }
     });
     return ws;
 }
@@ -121,7 +139,7 @@ async Task Claude()
     {
         var body = JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(extra))!.AsObject();
         body["session_id"] = id;
-        body["cwd"] = "D:/Projects/Fatebound";
+        body["cwd"] = "D:/Projects/Starfall";
         body["hook_event_name"] = evt;
         var r = await http.PostAsJsonAsync($"hooks/claude/{route}", body);
         var text = await r.Content.ReadAsStringAsync();

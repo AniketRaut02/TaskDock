@@ -1,136 +1,232 @@
-# TaskDock
+<p align="center">
+  <img src="docs/images/logo.png" alt="TaskDock" width="96" height="96">
+</p>
 
-A small always-on-top Windows widget that shows the live state of running work. It snaps to a screen corner. The full design is in `TaskDock — Execution Plan.pdf`.
+<h1 align="center">TaskDock</h1>
+
+<p align="center">
+  <b>Everything your PC is working on, in one quiet corner of the screen.</b><br>
+  An always-on-top Windows widget for Claude Code, Unity, VS Code, browser downloads and whatever is playing.<br>
+  It tells you when something is done, when something failed, and when something is waiting for you.
+</p>
+
+<p align="center">
+  <a href="https://github.com/AniketRaut02/TaskDock/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/AniketRaut02/TaskDock?label=release&color=3E8EF7"></a>
+  <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4">
+  <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10-512BD4">
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-30A46C"></a>
+</p>
+
+<p align="center">
+  <a href="#install">Install</a> ·
+  <a href="#connect-your-tools">Connect your tools</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#using-taskdock">Using TaskDock</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#faq">FAQ</a>
+</p>
+
+<p align="center">
+  <img src="docs/images/widget-expanded.png" alt="TaskDock showing a Claude Code approval, a failed VS Code build, Unity compiling, two Chrome downloads and the media bar" width="380">
+</p>
+
+---
+
+## Why TaskDock
+
+Modern work is a lot of waiting. Waiting for an AI agent to finish a turn or ask permission, for Unity to compile and reload, for a build to fail, for a 2 GB download. You end up checking five windows.
+
+TaskDock watches them for you and sits in a screen corner without ever taking focus:
+
+- **See everything at a glance.** One tile per source, colour-coded. The things that need you float to the top.
+- **Act without switching.** Approve or deny a Claude Code tool call, start Unity's play mode, pause a download, or skip a track, right from the tile.
+- **Hear only what matters.** You choose per tile which ones make a sound. Each finished job gets one sound, never a stream of them.
 
 ## Install
 
-Build every deliverable into `artifacts/release` (runs the tests first; needs the .NET 10 SDK and Node 22+):
+### The app: one line
 
-```bash
+Open **PowerShell** and run:
+
+```powershell
+irm https://raw.githubusercontent.com/AniketRaut02/TaskDock/master/install.ps1 | iex
+```
+
+This installs the latest release for your user (no admin rights) and starts it:
+
+- `TaskDock.exe` goes to `%LOCALAPPDATA%\Programs\TaskDock`, with a Start menu shortcut.
+- The browser extension is unpacked next to it, ready for **Load unpacked**.
+- If VS Code's `code` command is available, the installer offers to add the VS Code extension too.
+
+Run the same line again to upgrade. Your settings, presets and connections are kept.
+
+> **First run:** the build isn't code-signed yet, so Windows SmartScreen may say it "protected your PC". Click **More info → Run anyway**.
+
+Prefer a manual install? Every file is on the [Releases page](https://github.com/AniketRaut02/TaskDock/releases/latest).
+
+## Connect your tools
+
+Each integration is optional, and each takes about a minute.
+
+| Tool | Setup |
+|---|---|
+| **Claude Code** | Right-click the TaskDock tray icon → **Connect Claude Code**. Done. New sessions appear in the widget. |
+| **Unity** (2022.3+) | **Window → Package Manager → + → Add package from git URL**, then paste:<br>`https://github.com/AniketRaut02/TaskDock.git?path=/adapters/unity/com.darkpixelgd.taskdock`<br>Needs [Git](https://git-scm.com/download/win) installed. |
+| **VS Code** (1.93+) | Accept the installer's offer, or download `taskdock-0.1.0.vsix` from [Releases](https://github.com/AniketRaut02/TaskDock/releases/latest) → Extensions view → **…** → **Install from VSIX…** |
+| **Chrome, Edge, Brave** | Open `chrome://extensions` (or `edge://extensions`, `brave://extensions`) → turn on **Developer mode** → **Load unpacked** → pick `%LOCALAPPDATA%\Programs\TaskDock\browser-extension` |
+| **Spotify, YouTube, any player** | Nothing to set up. The media bar uses Windows' own media controls. |
+| **Any other app** | Drag the **⌖** button from the widget's header onto the app's window, or drop a shortcut or `.exe` on the widget. |
+
+New sources never add themselves. They wait under **+N detected** in the header (the tray icon shows the count) until you pin them.
+
+## Features
+
+### Integrations
+
+| | What you see | What you can do from the tile |
+|---|---|---|
+| **Claude Code** | Working · Needs approval · Needs input · Done · Failed, plus the tool it's running and how many subagents | **Allow**, **Always allow**, **Deny** with a reason Claude reads, or hand the decision back to the **Terminal** |
+| **Unity Editor** | Compiling · Reloading · Importing · Playing · Paused · Building · Compile errors (n) · Background task (%) · Main thread blocked · Not responding | **▶ Play**, **Pause**, **■ Stop**, **Focus** |
+| **VS Code** | Task running · Debugging · Command running (terminal commands longer than 10 s) · Succeeded · Failed (exit code) | **Focus** |
+| **Browser downloads** | Downloading (count, %, speed, time left) · Needs confirmation · Complete · Failed · Paused | **Pause**, **Resume**, **Cancel**, **Open**, **Show in folder** per file |
+| **Media bar** | Title, artist, cover art and progress of whatever Windows says is playing | Previous / play-pause / next, switch between players, pin one player, search Spotify or YouTube |
+| **Any window** | Running · Not responding · Closed, with the window title | **Focus**, **Launch** when it's closed |
+
+<p align="center">
+  <img src="docs/images/widget-media.png" alt="The media bar unfolded, with search" width="300">
+</p>
+
+### Three sizes
+
+Press **Ctrl+Alt+Shift+D** (or the button in the header) to cycle between them:
+
+<table>
+  <tr>
+    <td align="center" valign="top"><img src="docs/images/widget-expanded.png" alt="Expanded" width="230"><br><b>Expanded</b><br>Details, progress and actions</td>
+    <td align="center" valign="top"><img src="docs/images/widget-compact.png" alt="Compact" width="230"><br><b>Compact</b><br>One line per tile</td>
+    <td align="center" valign="top"><img src="docs/images/widget-pill.png" alt="Pill" width="230"><br><b>Pill</b><br>One dot in the worst colour, with counts</td>
+  </tr>
+</table>
+
+### Built to stay out of the way
+
+- **Never steals focus.** Clicking a tile doesn't pull you out of Unity or your editor. It's hidden from the taskbar and Alt-Tab.
+- **Snaps to a corner** of whichever monitor you drop it on, and grows toward the middle of the screen.
+- **Hides itself** while a game, presentation or fullscreen video is showing.
+- **Light:** about 32 MB of memory at idle and under 1% CPU with eight busy tiles.
+
+## Using TaskDock
+
+### Status colours
+
+| Colour | Meaning | Examples |
+|---|---|---|
+| 🟧 Amber | Waiting on you | Claude needs approval or input, a download needs confirmation |
+| 🟥 Red | Failed | Build exited with 1, compile errors, download interrupted, app not responding |
+| 🟦 Blue | Working | Compiling, downloading, Claude working, task running |
+| 🟩 Green | Finished since you last looked | Claude's turn done, download complete, task succeeded |
+| ⬜ Grey | Idle or offline | Ready, or not running |
+
+Amber and red tiles float to the top. A green tile turns grey once you hover over it.
+
+### Pin, notify, arrange
+
+- **Pin** a detected source with its pin button. A pinned tile remembers its project, folder or app, so it comes back when you reopen that project tomorrow, even though the session ID changes.
+- **The bell** on a pinned tile turns on sounds: one each for done, needs-you and failed. Sounds collapse to at most one per second. Drop your own `Complete.wav`, `Attention.wav` or `Error.wav` into `%APPDATA%\TaskDock\sounds` to replace them.
+- **Right-click a tile** for Rename, Focus, Launch and Remove.
+- **Drag the header** to move the widget. It snaps to the nearest corner.
+
+### Presets
+
+A preset saves your pinned tiles, their sounds, the corner and the size. Right-click the tray icon → **Presets**:
+
+- **Save current as…** saves the layout, with the command that launches each source.
+- Click a preset to **switch** to it. **Shift+click** merges it into what you have.
+- **Launch missing** starts every pinned source that isn't running, two seconds apart. For example, open your Unity project, its VS Code workspace and Claude Code in its folder with one click.
+
+### Settings
+
+Right-click the tray icon → **Settings…** for mute, volume, quiet hours, staying silent while you're looking at the source, hiding during fullscreen, **Start with Windows**, how long an approval waits in the widget before the terminal takes over, and the terminal command Claude tiles launch with.
+
+## How it works
+
+```mermaid
+flowchart LR
+    CC["Claude Code<br/>HTTP hooks"] -- "HTTP POST" --> HUB
+    UN["Unity Editor<br/>package"] -- WebSocket --> HUB
+    VS["VS Code<br/>extension"] -- WebSocket --> HUB
+    BR["Chrome · Edge · Brave<br/>extension"] -- WebSocket --> HUB
+    subgraph TD["TaskDock.exe"]
+        HUB["Local hub<br/>127.0.0.1 only"] --> REG["Tiles + rules"]
+        WIN["Windows APIs<br/>windows · media"] --> REG
+        REG --> UI["Widget"]
+        REG --> SND["Sounds"]
+    end
+```
+
+Every source reports to a small server inside TaskDock that only listens on your own machine. Claude Code needs no code of ours at all: TaskDock adds a few HTTP hooks to `~/.claude/settings.json`, after backing the file up. An approval works by holding Claude's permission request open until you click a button.
+
+### Privacy and security
+
+- **Nothing leaves your PC.** No telemetry, no accounts, no network calls beyond your own machine.
+- **Only you can approve.** Approve and Deny are buttons in the widget. No network request can make that decision.
+- **Locked to your machine.** The hub binds to `127.0.0.1`, needs a per-user token, rejects foreign `Host` headers (DNS rebinding) and never answers cross-origin requests. Browsers are accepted only from TaskDock's own extension.
+- **Downloads stay private.** The browser extension reports file names, sizes and progress, never URLs.
+- **Logs don't hold your work.** Prompts and tool inputs are never logged.
+
+## Requirements
+
+- Windows 10 (2004 or later) or Windows 11, 64-bit
+- Optional: Claude Code with HTTP hooks, Unity 2022.3 or 6, VS Code 1.93+, Chrome / Edge / Brave 116+
+
+## Build from source
+
+You need the [.NET 10 SDK](https://dotnet.microsoft.com/download) and [Node.js 22+](https://nodejs.org).
+
+```powershell
+git clone https://github.com/AniketRaut02/TaskDock.git
+cd TaskDock
 powershell -ExecutionPolicy Bypass -File tools/release.ps1
 ```
 
-| File | What to do with it |
-|---|---|
-| `TaskDock.exe` | Run it. Self-contained (no .NET install needed), about 185 MB. Unsigned, so Windows SmartScreen warns on first run: **More info → Run anyway**. Tray icon → **Settings…** has **Start with Windows** |
-| `com.darkpixelgd.taskdock-0.1.0.tgz` | Unity: **Window → Package Manager → + → Install package from tarball…** |
-| `taskdock-0.1.0.vsix` | VS Code: Extensions view → **…** → **Install from VSIX…** |
-| `taskdock-browser-extension.zip` | Unzip to a folder you keep. In Chrome / Edge / Brave: `chrome://extensions` → **Developer mode** → **Load unpacked** → that folder |
-| Claude Code | Nothing to install: tray icon → **Connect Claude Code** |
+This runs every test, then builds all four release files into `artifacts/release`. To work on the app itself:
 
-## Status (v0.1: all seven phases built)
-
-| Plan item | State |
-|---|---|
-| Core: protocol DTOs, status classes, per-adapter rules, TileRegistry (10 Hz coalescing), NotifyEngine (connect grace, 1 sound/s, mute, quiet hours), preset model + matcher | Done, unit-tested |
-| Hub: Kestrel on 127.0.0.1:47820–47829, `hub.json`, token, Host/Origin checks, no CORS, `/health`, `/ws`, `/hooks/claude/*` | Done, integration-tested over real sockets |
-| Claude Code adapter: session state machine, held PermissionRequest (Allow / Always allow / Deny + reason / Terminal / timeout), hooks installer (backup, idempotent, disconnect, rotate token, auto re-point on port change) | Done |
-| Widget: borderless, topmost, no focus stealing, hidden from taskbar and Alt-Tab, rounded corners, corner snapping that grows toward the screen middle, re-snap on display/DPI/work-area change, expanded/compact/pill modes, `Ctrl+Alt+Shift+D`, tray with detected-count badge, fullscreen auto-hide, approval card, detected-sources tray, pins + Notify bell saved to the preset, Launch for pinned tiles | Done; checked by hand with FakeAdapter |
-| Sounds: three generated tones, overridable in `%APPDATA%\TaskDock\sounds\{Complete,Attention,Error}.wav` | Done |
-| `protocol/taskdock.schema.json` + golden samples + C# contract test | Done |
-| FakeAdapter (`demo`, `claude`, `load`) | Done |
-| Generic tile: 1 s shared check (Running / Not responding / Closed), binds by process + optional `titleRegex`, rebinds after relaunch, a sound when a hung window recovers | Done. A hung test window showed Not responding after 5.0 s |
-| Crosshair picker (drag ⌖ onto a window; a click-through outline follows the cursor) + resolver (Unity, VS Code, browsers, terminals → choose a Claude session, else generic) | Done. Resolver is unit-tested; hit-test, shortcut reading and Focus were checked with a harness; the real mouse drag is untested |
-| File drop: `.exe` or `.lnk` onto the widget → a generic tile that launches what you dropped | Done; real drag-and-drop untested |
-| Focus button and right-click tile menu (Rename…, Focus, Launch, Remove); Notify stays silent when the source's window is already in front | Done |
-| Named presets (tray → Presets): apply (Shift+click merges), "Save current as…" (fills in launch commands from live tiles), "Launch missing" (2 s apart). Edits save into the active preset | Done; tray menu not clicked through by hand |
-| Settings window (tray → Settings…): mute, volume, quiet hours, silent when focused, fullscreen hide, auto-sort, Start with Windows (per-user Run key), Claude approval hold (rewrites the installed hooks' timeout), terminal launch template. Validated; applied live | Built and compiled; not clicked through by hand (the tray menu is out of reach for my UI automation) |
-| Release (Phase 7): `tools/release.ps1` builds the four artifacts above. Memory and CPU measured on the release `.exe` | 32 MB private working set at idle, 37–46 MB with 8 tiles at 10 updates/s, 0.77% CPU under that load, 58–62 MB plateau in a 12-minute churn soak. See "Soak" below |
-| Acrylic backdrop, snap animation, drag-to-reorder tiles | **Not started** (solid background) |
-| Unity package `com.darkpixelgd.taskdock` (Phase 3): every state in the plan's Unity table, background Progress items, Play / Stop / Pause from the tile, Preferences → TaskDock. Hub-side silence rules: Reloading held through the domain reload with elapsed seconds, Main thread blocked, Not responding, Closed. Notify settle: one sound per compile → reload → import chain, silent for play mode | See "Unity" below for what was verified |
-| Media bar (Phase 4): whatever Windows' media controls say is playing. Title, artist and thumbnail; previous / play-pause / next (greyed when the app doesn't offer them); a progress line; chips to switch sessions; a pin to stick to one app; Spotify / YouTube search (Enter searches where the music is playing). Using the controls makes the bar stick to that app | Checked with a silent test session: metadata 37–62 ms after a press, thumbnails from a real Brave/YouTube session. Search links are unit-tested but weren't opened; untested with Spotify |
-| Browser downloads extension (Phase 5, `adapters/chrome`): MV3, loads unpacked in Chrome, Edge and Brave. One tile per browser profile: Downloading (n, %) with speed and time left, Needs confirmation, Complete, Failed, Paused. An expandable file list with Pause / Resume / Cancel (sent to the browser) and Open / Show in folder (run by the widget). Sends file names, sizes, states and local paths, never URLs. A fixed key pins the extension ID; the hub accepts only that Origin | Checked in headless Edge 157: progress every second, 3 concurrent downloads, Cancel, Pause → Resume, one Complete sound per file, recovery after a browser restart and after the worker was killed. Not checked: a real network failure (Edge kept retrying, then called the partial file complete), Chrome, Brave |
-| VS Code extension (Phase 6, `adapters/vscode`): one tile per window. Failed (exit n) > Debugging > Task running > Command running > Succeeded > Idle, with the rest listed in the detail line. Terminal commands count only if they run at least `taskdock.longCommandSeconds` (10 s). `taskdock.notifyOnDebugEnd` (off) reports a finished debug session. Focus matches the window title against the workspace name | Unit-tested (11 Node tests). The bundled extension was run against the live hub with a stand-in for the VS Code API: task failure, ignored short command, long command → Succeeded, debugging, bye → Offline. **Not yet run inside a real VS Code** (none installed here) |
-
-## Run
-
-```bash
-dotnet test TaskDock.sln
-```
-
-```bash
+```powershell
 dotnet run --project src/TaskDock.App
 ```
 
-Watch Claude Code: tray icon → **Connect Claude Code**. This adds HTTP hooks to `~/.claude/settings.json`, after saving a backup at `settings.json.taskdock.bak`. **Disconnect Claude Code** removes only TaskDock's entries. New Claude sessions show up under "+N detected". Pin a session to keep its folder (`cwd`). The bell on a pinned tile turns on Notify sounds.
+The architecture, test suites, verification results and open questions are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). The original design is in [docs/execution-plan.pdf](docs/execution-plan.pdf).
 
-Try it without Claude Code (with TaskDock running):
+## Uninstall
 
-```bash
-dotnet run --project tools/TaskDock.FakeAdapter -- claude 30
-```
+1. If you connected Claude Code: tray icon → **Disconnect Claude Code**. This removes only TaskDock's hooks.
+2. If you turned on **Start with Windows**, turn it off in Settings.
+3. Quit TaskDock from the tray, then delete `%LOCALAPPDATA%\Programs\TaskDock` and the **TaskDock** Start menu shortcut.
+4. Optional: delete `%APPDATA%\TaskDock` (settings, presets) and `%LOCALAPPDATA%\TaskDock` (logs).
+5. Remove the Unity package, VS Code extension and browser extension the usual way.
 
-```bash
-dotnet run --project tools/TaskDock.FakeAdapter -- demo 60
-```
+## FAQ
 
-## Browser downloads
+**Does it work with the Claude desktop app or claude.ai?**
+No. Only Claude Code has the hooks TaskDock needs. Screen-scraping the others would break on every update.
 
-In Chrome, Edge or Brave: open `chrome://extensions` (Edge: `edge://extensions`), turn on **Developer mode**, click **Load unpacked**, and pick the `adapters/chrome` folder. The extension finds TaskDock on ports 47820–47829. Its options page shows the connection status and has a port override. The downloads tile shows up under "+N detected": pin it, and turn on the bell for a sound per finished file.
+**Why is `TaskDock.exe` about 185 MB?**
+It carries its own .NET runtime, so you don't have to install one, and it's left uncompressed on purpose: the compressed build is half the size but uses 110 MB of memory instead of 32 MB.
 
-```bash
-node --test "adapters/chrome/test/*.test.mjs"
-```
+**An approval card disappeared and the terminal asked me instead. Why?**
+An approval waits in the widget for 120 seconds by default (Settings → Approval hold). After that Claude Code's normal terminal prompt takes over, so nothing is ever stuck.
 
-## VS Code
-
-```bash
-cd adapters/vscode && npm install && npm run package
-```
-
-Then in VS Code: Extensions view → **…** → **Install from VSIX…** → `adapters/vscode/taskdock-0.1.0.vsix`. Each window shows up under "+N detected". Terminal commands are reported only with shell integration, which is on by default for PowerShell, bash and zsh. Tests: `npm test` in `adapters/vscode`.
-
-## Unity
-
-In your project, open **Window → Package Manager → +** and either **Install package from tarball…** (the release `.tgz`) or **Install package from disk…** (`adapters/unity/com.darkpixelgd.taskdock/package.json`). The package is Editor-only. Each Editor shows up under "+N detected" (one tile per Editor). Pin it to keep its project path, and turn on the bell for a sound when a compile → reload → import chain settles. Settings live under **Edit → Preferences → TaskDock**: enable, port override, background-task detail.
-
-Checked against Unity 6000.5.8f1 running in batch mode (a test driver edited scripts and blocked the main thread; the widget pressed the buttons):
-
-- The package compiles, and its 4 EditMode tests pass: frame shape matches the golden samples, the instance ID is stable, state priority is right.
-- 20 consecutive script edits each showed Compiling → Reloading → Importing → Idle, with exactly one Complete sound per edit, 1.5 s after it settled.
-- An 8 s main-thread block showed Main thread blocked after 5.1 s and cleared 0.4 s after it ended, with no sound.
-- ▶ Play, Pause and ■ Stop on the tile drove play mode. The play-mode episode made no sound.
-- Killing the Editor showed Closed after 0.6 s.
-- Unity 6's asset-import worker processes are skipped, so each Editor shows up as one tile.
-- Not yet checked: an Editor with a window (Focus, Not responding on a real hang), Unity 2022.3, Building, and background tasks with progress.
-
-Unity's update tick is throttled while the Editor is in the background. If "Main thread blocked" flickers while Unity is idle and unfocused, raise `UnityBlockedAfter` in `HubOptions` (default 5 s).
-
-## Files
-
-- `%LOCALAPPDATA%\TaskDock\hub.json`: port, token, pid. Unity and VS Code adapters read this file.
-- `%LOCALAPPDATA%\TaskDock\logs\`: rolling log, 5 × 1 MB. No prompt or tool-input text is logged.
-- `%APPDATA%\TaskDock\settings.json`: what the Settings window edits, plus the media bar's pin and fold state.
-- `%APPDATA%\TaskDock\presets\<name>.json`: pins, corner and mode, in the plan's preset format.
-
-## Still unverified (Phase 0 spikes that need a real Claude Code session)
-
-The hub follows the hooks docs: an empty 200 means no decision, an HTTP failure is non-blocking, and the PermissionRequest hook timeout is set to the hold window + 10 s. Four things are still open and need a real interactive session to settle:
-
-1. Does the terminal prompt show while the PermissionRequest hook is pending? If not, set `holdSeconds` to about 20 (see Risks in the plan).
-2. Does an empty 200 really leave the normal prompt in place?
-3. What happens if the hook timeout fires mid-hold?
-4. Which hooks fire inside the VS Code extension, compared with the CLI?
-
-## Soak
-
-Run against the release `.exe` with `TaskDock.FakeAdapter` (private working set, the number Task Manager shows):
-
-- **Reconnect torture, 15 min:** fake Unity, VS Code, downloads and Claude adapters connected at random and were killed mid-stream (43 launches, 15 kills), and the widget itself was killed and restarted 6 times. It came back healthy within 500 ms every time.
-- **The soak found a real leak.** The tray badge was regenerated on every change, and each regeneration leaked GDI objects. After 20 minutes of churn the widget hit Windows' limit (9,996 of 10,000), logged 406 drawing errors, and memory plateaued at 76–80 MB. Fixed: the ten badges are drawn once and reused. Under the same churn GDI now stays at about 30.
-- **Soak after the fix, 12 min:** 8 load adapters at 10 updates/s plus Unity, VS Code and Claude sessions, all reconnecting every 30 s. Memory plateaued at 58–62 MB; handles stayed flat around 800; 0 errors.
-- **Not done:** the plan's 8-hour soak and the "clean machine in under 15 minutes" setup check.
+**Firefox? macOS? Linux?**
+Not in v1. TaskDock is Windows-only, and the downloads extension supports Chromium browsers only.
 
 ## Known limitations
 
-These ship as-is in v1.
+- **One media session per browser.** Chrome reports the most recent tab that's playing, not each tab.
+- **Spotify search opens results** in Spotify; it doesn't start playback.
+- **Focus has gaps.** VS Code's Focus button needs the folder name in the window title, and Claude Code tiles can't focus their terminal yet.
+- **Unsigned builds** show a SmartScreen warning on first run.
+- **Not yet tested everywhere.** Some paths haven't been checked by hand yet: a real VS Code, Chrome and Brave, Spotify, Unity 2022.3, and two monitors at 150% scaling. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for exactly what was verified and how.
 
-- Claude desktop app and claude.ai chats are not supported. Only Claude Code has hooks.
-- File Explorer is not supported.
-- Windows only, and Chromium browsers only (no Firefox).
-- One media session per Chrome, not per tab. Spotify search opens the results page; it doesn't auto-play.
-- VS Code Focus fails if `window.title` hides the folder name. Claude tiles have no Focus at all: a hook request can't be traced to its terminal yet (stretch goal).
-- Unsigned builds show a SmartScreen warning on first run.
-- The single-file `.exe` is about 185 MB, on purpose: the compressed build is 84 MB but uses 110 MB of private memory instead of 32 MB.
-- A Claude session that needs approval surfaces even when it isn't pinned, so an approval never waits unseen. Other new sources stay in the detected tray, as the plan specifies.
-- Not verified by hand: typing a Deny reason, file drop, the tray Presets menu, the Settings window, two monitors / 150% scaling, Spotify, a real VS Code, Chrome and Brave.
+## License
+
+[MIT](LICENSE) © 2026 Aniket Raut (DarkPixel GD)

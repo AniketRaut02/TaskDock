@@ -171,6 +171,7 @@ public partial class App : Application
     System.Drawing.Icon Badge(string text)
     {
         if (_badges.TryGetValue(text, out var icon)) return icon;
+        if (text == "T" && System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) is { } logo) return _badges[text] = logo; // nothing waiting: the app logo
         using var bmp = new System.Drawing.Bitmap(32, 32);
         using (var g = System.Drawing.Graphics.FromImage(bmp))
         using (var font = new System.Drawing.Font("Segoe UI", 17, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Pixel))

@@ -7,6 +7,10 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>TaskDock</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\TaskDock.ico</ApplicationIcon>
+    <Version>0.1.0</Version>
+    <Product>TaskDock</Product>
+    <Copyright>© 2026 Aniket Raut (DarkPixel GD). MIT License.</Copyright>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />

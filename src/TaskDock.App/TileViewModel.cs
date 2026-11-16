@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using TaskDock.Core.Dock;
 using TaskDock.Core.Presets;
 using TaskDock.Core.Rules;
 using TaskDock.Core.Tiles;
@@ -61,16 +62,20 @@ public sealed partial class TileViewModel(MainViewModel owner, string key) : Obs
         IsPinned = pin != null;
         IsPlaceholder = t == null;
         SetProperty(ref _notify, pin?.Notify ?? false, nameof(Notify));
+        var caps = TileCaps.For(t, pin);
+        CanLaunch = caps.Launch;
+        CanFocus = caps.Focus;
+        CanPlay = caps.Play;
+        CanStopPause = caps.Stop;
+        PauseText = caps.PauseText;
 
         if (t == null)
         {
-            Label = pin!.Label ?? Describe(pin);
+            Label = pin!.Label ?? SnapshotBuilder.Describe(pin);
             StateText = "Waiting";
             Detail = $"Waiting for {pin.Adapter}…";
             Class = StatusClass.Offline;
             HasProgress = false;
-            CanLaunch = pin.Launch != null;
-            CanFocus = CanPlay = CanStopPause = false;
             SyncItems(null);
         }
         else
@@ -81,12 +86,7 @@ public sealed partial class TileViewModel(MainViewModel owner, string key) : Obs
             Class = t.Class;
             HasProgress = t.Progress != null;
             Progress = t.Progress ?? 0;
-            CanLaunch = t.Class == StatusClass.Offline && pin?.Launch != null;
-            CanFocus = t.Adapter is not ("claude" or "downloads") && t.Class != StatusClass.Offline; // neither reports a window
-            CanPlay = t.Adapter == "unity" && t.State == "Idle";
-            CanStopPause = t.Adapter == "unity" && t.State is "Playing" or "Paused";
             SyncItems(t.Adapter == "downloads" ? t.Items : null);
-            PauseText = t.State == "Paused" ? "Resume" : "Pause";
         }
         ClassBrush = Palette.Of(Class);
         Glyph = AppIcons.GlyphFor(t?.Adapter ?? pin!.Adapter);
@@ -98,11 +98,6 @@ public sealed partial class TileViewModel(MainViewModel owner, string key) : Obs
         MoreApprovals = approvals is { Count: > 1 } ? $"+{approvals.Count - 1} more queued" : null;
         return this;
     }
-
-    static string Describe(PresetTile pin) =>
-        pin.Match.TryGetValue("cwd", out var p) || pin.Match.TryGetValue("projectPath", out p) || pin.Match.TryGetValue("workspacePath", out p)
-            ? ClaudeSessions.FolderName(p)
-            : pin.Match.Values.FirstOrDefault() ?? pin.Adapter;
 
     [RelayCommand] void Pin() { if (_tile != null) owner.Pin(_tile); }
     [RelayCommand] void Unpin() { if (_pin != null) owner.Unpin(_pin); }

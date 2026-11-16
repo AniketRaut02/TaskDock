@@ -87,7 +87,7 @@ public sealed partial class MediaViewModel : ObservableObject
         Apps.Clear();
         foreach (var a in apps) Apps.Add(new MediaChip(a, MediaSearch.FriendlyName(a), a == _info?.AppId));
         ShowChips = apps.Count > 1;
-        if (_info == null) return;
+        if (_info == null) { Changed?.Invoke(); return; }
 
         Title = _info.Title.Length > 0 ? _info.Title : MediaSearch.FriendlyName(_info.AppId);
         Artist = _info.Artist;
@@ -96,14 +96,29 @@ public sealed partial class MediaViewModel : ObservableObject
         (CanPrevious, CanToggle, CanNext) = (_info.CanPrevious, _info.CanToggle, _info.CanNext);
         IsPinned = pinned == _info.AppId;
         UpdateProgress();
+        Changed?.Invoke();
 
         if (_thumbKey != _info.TrackKey)
         {
             var key = _thumbKey = _info.TrackKey;
-            var img = ToImage(await _svc.ThumbnailAsync(_info.AppId, key));
-            if (_thumbKey == key) Thumb = img; // a faster, newer refresh may have moved on to another track
+            _artHash = null; // never pair the new track with the old cover
+            var bytes = await _svc.ThumbnailAsync(_info.AppId, key);
+            if (_thumbKey != key) return; // a faster, newer refresh may have moved on to another track
+            Thumb = ToImage(bytes);
+            _artHash = bytes is { Length: > 0 } ? Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes)) : null;
+            Changed?.Invoke();
         }
     }
+
+    string? _artHash;
+
+    /// <summary>Raised on the UI thread whenever what ToView returns may have changed.</summary>
+    internal event Action? Changed;
+
+    internal Core.Dock.MediaView? ToView() => _info is not { } i ? null : new(
+        i.AppId, MediaSearch.FriendlyName(i.AppId), Title, Artist, Playing, CanPrevious, CanToggle, CanNext,
+        i.Position, i.Duration, i.TimelineAt.Year > 2000 ? i.TimelineAt.ToUnixTimeMilliseconds() : null, _artHash,
+        Apps.Select(c => new Core.Dock.MediaAppView(c.AppId, c.Name, c.Selected)).ToList(), IsPinned);
 
     void UpdateProgress()
     {
@@ -132,15 +147,15 @@ public sealed partial class MediaViewModel : ObservableObject
 
     // Using the bar's controls makes it stick to that app: pausing must not hand the bar to whatever
     // Windows promotes to "current" next, or the following press would resume the wrong player.
-    [RelayCommand] async Task Previous() { if (_svc != null && Stick() is { } app) await _svc.PreviousAsync(app); }
-    [RelayCommand] async Task TogglePlay() { if (_svc != null && Stick() is { } app) await _svc.TogglePlayPauseAsync(app); }
-    [RelayCommand] async Task Next() { if (_svc != null && Stick() is { } app) await _svc.NextAsync(app); }
+    [RelayCommand] internal async Task Previous() { if (_svc != null && Stick() is { } app) await _svc.PreviousAsync(app); }
+    [RelayCommand] internal async Task TogglePlay() { if (_svc != null && Stick() is { } app) await _svc.TogglePlayPauseAsync(app); }
+    [RelayCommand] internal async Task Next() { if (_svc != null && Stick() is { } app) await _svc.NextAsync(app); }
 
     string? Stick() => _chosen = _info?.AppId;
     [RelayCommand] void ToggleCollapsed() => Collapsed = !Collapsed;
 
     [RelayCommand]
-    async Task Select(string appId)
+    internal async Task Select(string appId)
     {
         _chosen = appId;
         if (_settings.MediaPinnedApp != null && _settings.MediaPinnedApp != appId) { _settings.MediaPinnedApp = null; _settings.Save(); }
@@ -156,13 +171,15 @@ public sealed partial class MediaViewModel : ObservableObject
         await Refresh();
     }
 
-    [RelayCommand] void SearchSpotify() => Search(SearchTarget.Spotify);
-    [RelayCommand] void SearchYouTube() => Search(SearchTarget.YouTube);
-    public void SearchDefault() => Search(MediaSearch.DefaultFor(_info?.AppId));
+    internal Task SetPinned(bool on) => on == IsPinned ? Task.CompletedTask : TogglePin();
 
-    void Search(SearchTarget target)
+    [RelayCommand] void SearchSpotify() => Search(SearchTarget.Spotify, Query);
+    [RelayCommand] void SearchYouTube() => Search(SearchTarget.YouTube, Query);
+    public void SearchDefault() => Search(MediaSearch.DefaultFor(_info?.AppId), Query);
+
+    internal void Search(SearchTarget target, string query)
     {
-        if (MediaSearch.UriFor(target, Query) is not { } uri) return;
+        if (MediaSearch.UriFor(target, query) is not { } uri) return;
         try { Process.Start(new ProcessStartInfo(uri.OriginalString) { UseShellExecute = true })?.Dispose(); }
         catch (Win32Exception) { _hint(target == SearchTarget.Spotify ? "Spotify search needs the Spotify desktop app." : "Couldn't open the browser."); }
     }

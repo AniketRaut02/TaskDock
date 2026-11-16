@@ -59,7 +59,12 @@ static class PresetStore
 {
     static string FileOf(string name) => Path.Combine(Paths.Presets, string.Concat(name.Split(Path.GetInvalidFileNameChars())) + ".json");
 
-    public static Preset Load(string name) => Paths.ReadJson<Preset>(FileOf(name)) ?? new Preset { Name = name };
+    public static Preset Load(string name)
+    {
+        if (Paths.ReadJson<Preset>(FileOf(name)) is not { } p) return new Preset { Name = name };
+        if (p.AssignMissingIds()) Save(p);
+        return p;
+    }
 
     public static void Save(Preset p) =>
         Paths.WriteAtomic(FileOf(p.Name), JsonSerializer.Serialize(p, new JsonSerializerOptions(Wire.Json) { WriteIndented = true }));

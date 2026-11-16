@@ -43,11 +43,19 @@ public sealed partial class MainViewModel : ObservableObject
     internal Func<string, string, System.Text.Json.JsonElement?, Task<Core.Protocol.ResultBody>> SendCommand { get; set; } =
         (_, _, _) => Task.FromResult(new Core.Protocol.ResultBody("", false, "not connected"));
 
-    internal async void Command(Tile t, string action, System.Text.Json.JsonElement? args = null)
+    internal async void Command(Tile t, string action, System.Text.Json.JsonElement? args = null) => await CommandAsync(t, action, args);
+
+    /// <summary>Null on success, else the adapter's error (already shown as a hint).</summary>
+    internal async Task<string?> CommandAsync(Tile t, string action, System.Text.Json.JsonElement? args = null)
     {
         var r = await SendCommand(t.Key, action, args);
-        if (!r.Ok) ShowHint($"{t.Label}: {action} failed ({r.Error})");
+        if (r.Ok) return null;
+        ShowHint($"{t.Label}: {action} failed ({r.Error})");
+        return r.Error ?? "failed";
     }
+
+    /// <summary>Raised at the end of every Sync, on the UI thread.</summary>
+    internal event Action? SnapshotChanged;
 
     /// <summary>Open and Show in folder run here from the item's local path, so the extension needs no downloads.open permission.</summary>
     internal void OpenDownload(string? path, bool showInFolder)
@@ -102,11 +110,10 @@ public sealed partial class MainViewModel : ObservableObject
 
         TileViewModel Vm(string key) => existing.TryGetValue(key, out var v) ? v : new TileViewModel(this, key);
 
-        for (var i = 0; i < Preset.Tiles.Count; i++)
+        foreach (var pin in Preset.Tiles)
         {
-            var pin = Preset.Tiles[i];
             var live = PresetMatcher.Bound(pin, Registry.Tiles);
-            if (live.Count == 0) desired.Add(Vm("pin:" + i).Update(null, pin, null));
+            if (live.Count == 0) desired.Add(Vm("pin:" + pin.Id).Update(null, pin, null));
             foreach (var t in live.Where(t => bound.Add(t.Key)))
                 desired.Add(Vm(t.Key).Update(t, pin, t.Adapter == "claude" ? pending[t.Instance].ToList() : null));
         }
@@ -129,16 +136,10 @@ public sealed partial class MainViewModel : ObservableObject
         IsEmpty = desired.Count == 0;
         if (detected.Count == 0) ShowDetected = false;
 
-        var live2 = desired.Where(v => !v.IsPlaceholder).ToList();
-        var worst = live2.Count == 0 ? StatusClass.Idle : live2.Min(v => v.Class);
-        PillBrush = Palette.Of(worst);
-        var parts = new List<string>();
-        void Count(StatusClass c, string text) { var n = live2.Count(v => v.Class == c); if (n > 0) parts.Add($"{n} {text}"); }
-        Count(StatusClass.Attention, "needs you");
-        Count(StatusClass.Error, "failed");
-        Count(StatusClass.Busy, "busy");
-        Count(StatusClass.Done, "done");
-        PillText = parts.Count == 0 ? "All quiet" : string.Join(" · ", parts);
+        var pill = Core.Dock.Pill.Of(desired.Where(v => !v.IsPlaceholder).Select(v => v.Class));
+        PillBrush = Palette.Of(pill.Worst);
+        PillText = pill.Text;
+        SnapshotChanged?.Invoke();
     }
 
     static void Reconcile(ObservableCollection<TileViewModel> list, List<TileViewModel> desired)
@@ -167,6 +168,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (!Preset.Tiles.Any(p => p.Adapter == pin.Adapter && p.Match.Count == pin.Match.Count
                 && p.Match.All(kv => pin.Match.TryGetValue(kv.Key, out var v) && v.Equals(kv.Value, StringComparison.OrdinalIgnoreCase))))
         {
+            if (Preset.Tiles.Any(p => p.Id == pin.Id)) pin.Id = PresetTile.NewId(); // merged from a copy of this preset
             Preset.Tiles.Add(pin);
             _savePreset();
         }
@@ -222,7 +224,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             var copy = new PresetTile
             {
-                Adapter = pin.Adapter, Label = pin.Label, Notify = pin.Notify,
+                Id = pin.Id, Adapter = pin.Adapter, Label = pin.Label, Notify = pin.Notify,
                 Match = new Dictionary<string, string>(pin.Match), Launch = pin.Launch?.DeepClone().AsObject(),
             };
             copy.Launch ??= Registry.Tiles.Where(t => PresetMatcher.Matches(pin, t)).Select(LaunchFor).FirstOrDefault(l => l != null);

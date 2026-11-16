@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <None Include="..\..\protocol\samples\*.json" Link="samples\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\protocol\remote\samples\*.json" Link="remote-samples\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

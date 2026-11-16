@@ -28,6 +28,7 @@ public partial class App : Application
     TaskbarIcon? _tray;
     MainWindow? _window;
     MainViewModel? _vm;
+    DockHost? _dock; // the remote server's view of the widget (Phase 2)
     AppSettings _settings = new();
     bool _userHidden;
 
@@ -109,6 +110,7 @@ public partial class App : Application
         };
 
         _vm.Media = new MediaViewModel(_settings, text => _vm.ShowHint(text), Dispatcher);
+        _dock = new DockHost(_vm, Dispatcher, () => _hubOptions.HoldWindow, ApplyPreset);
         _window = new MainWindow(_vm, _settings);
         _vm.Sync();
         _window.Show();

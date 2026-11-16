@@ -12,10 +12,25 @@ public sealed class Preset
     public string Corner { get; set; } = "bottomRight";
     public string Mode { get; set; } = "expanded";
     public List<PresetTile> Tiles { get; set; } = [];
+
+    /// <summary>Gives pins from an older file their ID. True when any was missing, so the caller saves.</summary>
+    public bool AssignMissingIds()
+    {
+        var missing = Tiles.Any(t => !t.HasId);
+        foreach (var t in Tiles) _ = t.Id;
+        return missing;
+    }
 }
 
 public sealed class PresetTile
 {
+    string? _id;
+
+    /// <summary>Stable pin identity (12 hex chars): remote actions name a pin by this, never by its position.</summary>
+    public string Id { get => _id ??= NewId(); set => _id = value; }
+    internal bool HasId => _id != null;
+    public static string NewId() => Convert.ToHexStringLower(System.Security.Cryptography.RandomNumberGenerator.GetBytes(6));
+
     public string Adapter { get; set; } = "";
     public string? Label { get; set; }
     public bool Notify { get; set; }

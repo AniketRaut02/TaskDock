@@ -1,0 +1,16 @@
+{
+  "name": "taskdock-remote-web",
+  "private": true,
+  "description": "TaskDock Remote: the phone app, served by TaskDock itself.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && tsc --noEmit -p tsconfig.sw.json && node build.mjs",
+    "test": "node --test test/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.9",
+    "esbuild": "0.25.8",
+    "typescript": "5.9.2"
+  },
+  "license": "MIT"
+}

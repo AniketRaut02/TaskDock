@@ -1,0 +1,25 @@
+{
+  "Version": "1.104.7-tfb3b9b296-g0651cc45e",
+  "TUN": true,
+  "BackendState": "Running",
+  "AuthURL": "",
+  "TailscaleIPs": ["100.64.0.1", "fd7a:115c:a1e0::1"],
+  "Self": {
+    "ID": "nTEST00001CNTRL",
+    "HostName": "PC",
+    "DNSName": "pc.tail1234.ts.net.",
+    "OS": "windows",
+    "UserID": 7311522224449473,
+    "TailscaleIPs": ["100.64.0.1", "fd7a:115c:a1e0::1"],
+    "Online": true
+  },
+  "Health": [],
+  "MagicDNSSuffix": "tail1234.ts.net",
+  "CurrentTailnet": { "Name": "me@example.com", "MagicDNSSuffix": "tail1234.ts.net", "MagicDNSEnabled": true },
+  "CertDomains": ["pc.tail1234.ts.net"],
+  "Peer": {},
+  "User": {
+    "7311522224449473": { "ID": 7311522224449473, "LoginName": "me@example.com", "DisplayName": "Test User", "ProfilePicURL": "" }
+  },
+  "ClientVersion": null
+}

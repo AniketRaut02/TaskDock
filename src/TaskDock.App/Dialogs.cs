@@ -38,6 +38,39 @@ sealed class PickerOverlay : Window
     }
 }
 
+static class ConfirmDialog
+{
+    /// <summary>A topmost yes/no that closes itself (as "no") when ct fires. Call on the UI thread.</summary>
+    public static Task<bool> AskAsync(string title, string text, string yes, string no, CancellationToken ct)
+    {
+        var tcs = new TaskCompletionSource<bool>();
+        var allow = new Button { Content = yes, MinWidth = 90, Margin = new Thickness(0, 0, 6, 0) };
+        var deny = new Button { Content = no, IsCancel = true, IsDefault = true, MinWidth = 90 }; // Enter must not approve by accident
+        var w = new Window
+        {
+            Title = title, SizeToContent = SizeToContent.WidthAndHeight, ResizeMode = ResizeMode.NoResize,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen, Topmost = true, ShowInTaskbar = true,
+            Content = new StackPanel
+            {
+                Margin = new Thickness(16), MaxWidth = 380,
+                Children =
+                {
+                    new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, FontSize = 14 },
+                    new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0), Children = { allow, deny } },
+                },
+            },
+        };
+        allow.Click += (_, _) => { tcs.TrySetResult(true); w.Close(); };
+        deny.Click += (_, _) => w.Close();
+        w.Closed += (_, _) => tcs.TrySetResult(false);
+        var reg = ct.Register(() => w.Dispatcher.BeginInvoke(w.Close));
+        _ = tcs.Task.ContinueWith(_ => reg.Dispose(), TaskScheduler.Default);
+        w.Show();
+        w.Activate();
+        return tcs.Task;
+    }
+}
+
 static class InputDialog
 {
     /// <summary>A plain modal prompt. It is a normal, activating window so you can type.</summary>

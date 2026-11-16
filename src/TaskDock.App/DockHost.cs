@@ -12,7 +12,7 @@ namespace TaskDock.App;
 /// The widget as a second client sees it: an immutable snapshot after each Sync, and the catalog actions run through
 /// the same methods the widget's buttons call, on the UI thread.
 /// </summary>
-sealed class DockHost : IDockOps
+sealed class DockHost : IDockOps, Remote.IDockHost
 {
     readonly MainViewModel _vm;
     readonly Dispatcher _ui;
@@ -58,6 +58,11 @@ sealed class DockHost : IDockOps
     public Task<DockResult> RunAsync(DockAction action) => _ui.InvokeAsync(() => ActionRouter.RunAsync(action, this)).Task.Unwrap();
 
     public Requirement Requirement(DockAction action) => ActionRouter.Requirement(action, this);
+
+    /// <summary>The device name comes from the phone: it is shown as plain text only.</summary>
+    public Task<bool> ConfirmPairingAsync(string deviceName, CancellationToken ct) =>
+        _ui.InvokeAsync(() => ConfirmDialog.AskAsync("TaskDock Remote", $"Allow \"{deviceName}\" to control TaskDock?\n\nOnly say yes if you just paired this phone yourself.",
+            "Allow", "Don't allow", ct)).Task.Unwrap();
 
     // ---------- IDockOps: live state ----------
 

@@ -1,0 +1,15 @@
+{
+  "epoch": "e1",
+  "rev": 8,
+  "upsert": [
+    {
+      "key": "unity|g1", "pinId": "a1b2c3d4e5f6", "adapter": "unity", "label": "MyGame", "state": "Paused", "class": "busy",
+      "placeholder": false, "notify": true,
+      "caps": { "play": false, "stop": true, "pause": true, "pauseText": "Resume", "launch": false, "peek": true, "pin": false, "unpin": true, "ack": false }
+    }
+  ],
+  "remove": ["downloads|chrome"],
+  "order": ["unity|g1", "claude|s1", "pin:0f0e0d0c0b0a"],
+  "approvals": [],
+  "pill": { "text": "1 needs you · 1 busy", "worst": "attention" }
+}

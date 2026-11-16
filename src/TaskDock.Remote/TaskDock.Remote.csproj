@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Fido2" Version="4.3.3" />
+    <ProjectReference Include="..\TaskDock.Core\TaskDock.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The phone app, built by remote-web (npm run build). Missing in a clean clone without Node: the server then says so. -->
+    <EmbeddedResource Include="..\..\remote-web\dist\**\*" LogicalName="web/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="TaskDock.Remote.Tests" />
+  </ItemGroup>
+</Project>

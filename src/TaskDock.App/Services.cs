@@ -35,6 +35,8 @@ static class Paths
 sealed class AppSettings
 {
     public string LastPreset { get; set; } = "Default";
+    /// <summary>TaskDock Remote: serve the phone app on this PC's tailnet name.</summary>
+    public bool RemoteEnabled { get; set; }
     /// <summary>Centre of the widget in screen pixels; picks the monitor on startup.</summary>
     public int? AnchorX { get; set; }
     public int? AnchorY { get; set; }

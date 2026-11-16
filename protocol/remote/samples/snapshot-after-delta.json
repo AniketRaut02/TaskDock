@@ -1,0 +1,130 @@
+{
+  "epoch": "e1",
+  "rev": 8,
+  "pill": {
+    "text": "1 needs you · 1 busy",
+    "worst": "attention"
+  },
+  "tiles": [
+    {
+      "key": "unity|g1",
+      "pinId": "a1b2c3d4e5f6",
+      "adapter": "unity",
+      "label": "MyGame",
+      "state": "Paused",
+      "class": "busy",
+      "placeholder": false,
+      "notify": true,
+      "caps": {
+        "play": false,
+        "stop": true,
+        "pause": true,
+        "pauseText": "Resume",
+        "launch": false,
+        "peek": true,
+        "pin": false,
+        "unpin": true,
+        "ack": false
+      }
+    },
+    {
+      "key": "claude|s1",
+      "adapter": "claude",
+      "label": "api",
+      "state": "Needs approval",
+      "class": "attention",
+      "detail": "Bash: npm test",
+      "placeholder": false,
+      "notify": false,
+      "caps": {
+        "play": false,
+        "stop": false,
+        "pause": false,
+        "pauseText": "Pause",
+        "launch": false,
+        "peek": false,
+        "pin": true,
+        "unpin": false,
+        "ack": false
+      }
+    },
+    {
+      "key": "pin:0f0e0d0c0b0a",
+      "pinId": "0f0e0d0c0b0a",
+      "adapter": "claude",
+      "label": "web",
+      "state": "Waiting",
+      "class": "offline",
+      "detail": "Waiting for claude…",
+      "placeholder": true,
+      "notify": false,
+      "caps": {
+        "play": false,
+        "stop": false,
+        "pause": false,
+        "pauseText": "Pause",
+        "launch": true,
+        "peek": false,
+        "pin": false,
+        "unpin": true,
+        "ack": false
+      }
+    }
+  ],
+  "detected": [
+    {
+      "key": "vscode|w1",
+      "adapter": "vscode",
+      "label": "TaskDoc",
+      "state": "Idle",
+      "class": "idle",
+      "placeholder": false,
+      "notify": false,
+      "caps": {
+        "play": false,
+        "stop": false,
+        "pause": false,
+        "pauseText": "Pause",
+        "launch": false,
+        "peek": true,
+        "pin": true,
+        "unpin": false,
+        "ack": false
+      }
+    }
+  ],
+  "approvals": [],
+  "media": {
+    "appId": "Spotify.exe",
+    "appName": "Spotify",
+    "title": "Song",
+    "artist": "Band",
+    "playing": true,
+    "canPrev": true,
+    "canToggle": true,
+    "canNext": true,
+    "position": 30,
+    "duration": 200,
+    "timelineAt": 1763200000000,
+    "artHash": "ab12",
+    "apps": [
+      {
+        "appId": "Spotify.exe",
+        "name": "Spotify",
+        "selected": true
+      }
+    ],
+    "pinned": false
+  },
+  "presets": {
+    "active": "Default",
+    "names": [
+      "Default",
+      "Work"
+    ]
+  },
+  "flags": {
+    "away": false,
+    "keepAwake": false
+  }
+}

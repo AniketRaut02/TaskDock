@@ -28,7 +28,9 @@ public partial class App : Application
     TaskbarIcon? _tray;
     MainWindow? _window;
     MainViewModel? _vm;
-    DockHost? _dock; // the remote server's view of the widget (Phase 2)
+    DockHost? _dock;
+    RemoteControl? _remote;
+    RemoteWindow? _remoteWindow;
     AppSettings _settings = new();
     bool _userHidden;
 
@@ -117,6 +119,13 @@ public partial class App : Application
         _tray = BuildTray(notify, sounds);
         _vm.Hint += text => _tray.ShowNotification("TaskDock", text);
         await _vm.Media.StartAsync();
+
+        _remote = new RemoteControl(_dock);
+        if (_settings.RemoteEnabled && await _remote.EnableAsync() is { } problem)
+        {
+            Log.Warning("Remote stayed off: {Problem}", problem);
+            _vm.ShowHint("Phone access is off: " + problem);
+        }
 
         // Drain on the UI thread at 10 Hz: every event reaches Notify, the UI repaints once per tick.
         var approvalsChanged = 1;
@@ -252,6 +261,7 @@ public partial class App : Application
         mute.Click += (_, _) => { notify.Muted = _settings.Muted = mute.IsChecked; _settings.Save(); };
         menu.Opened += (_, _) => mute.IsChecked = notify.Muted; // the settings window can change it too
         menu.Items.Add(mute);
+        menu.Items.Add(Item("Phone (Remote)…", OpenRemote));
         menu.Items.Add(Item("Settings…", () => OpenSettings(notify, sounds)));
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("Quit", Quit));
@@ -300,6 +310,14 @@ public partial class App : Application
         _tray.ToolTipText = $"TaskDock · {_vm.PillText}";
     }
 
+    void OpenRemote()
+    {
+        if (_remote == null) return;
+        if (_remoteWindow is { IsLoaded: true }) { _remoteWindow.Activate(); return; }
+        _remoteWindow = new RemoteWindow(_remote, _settings);
+        _remoteWindow.Show();
+    }
+
     void ApplyPreset(string name, bool merge)
     {
         _vm!.Apply(PresetStore.Load(name), merge);
@@ -345,6 +363,7 @@ public partial class App : Application
 
     protected override async void OnExit(ExitEventArgs e)
     {
+        if (_remote != null) await _remote.StopAsync();
         if (_hub != null) await _hub.DisposeAsync(); // held approvals return "no decision"; Claude Code falls back to its own prompt
         Log.CloseAndFlush();
         _single?.Dispose();

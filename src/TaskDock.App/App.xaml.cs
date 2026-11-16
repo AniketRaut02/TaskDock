@@ -122,6 +122,13 @@ public partial class App : Application
         var tick = 0;
         var timer = new DispatcherTimer(TimeSpan.FromMilliseconds(100), DispatcherPriority.Background, (_, _) =>
         {
+            try { Tick(); }
+            catch (Exception ex) { Log.Error(ex, "Tick failed"); } // one bad tick must never stop the widget updating
+        }, Dispatcher);
+        timer.Start();
+
+        void Tick()
+        {
             var dirty = Interlocked.Exchange(ref approvalsChanged, 0) == 1;
             while (events.Reader.TryRead(out var ev)) { registry.Apply(ev); dirty = true; }
             if (notify.Tick() is var (settled, tile) && tile != null) Play(settled, tile); // Unity's settle window
@@ -136,8 +143,7 @@ public partial class App : Application
                 _vm.Sync();
                 UpdateTrayBadge();
             }
-        }, Dispatcher);
-        timer.Start();
+        }
     }
 
     /// <summary>Windows' own "not responding" check on a process's main window (called from the hub's threads).</summary>
@@ -167,6 +173,7 @@ public partial class App : Application
     // until Windows' 10,000-per-process limit (found by the Phase 7 soak).
     readonly Dictionary<string, System.Drawing.Icon> _badges = new();
     string _badge = "";
+    System.Drawing.Icon? _shown;
 
     System.Drawing.Icon Badge(string text)
     {
@@ -247,7 +254,7 @@ public partial class App : Application
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("Quit", Quit));
 
-        var tray = new TaskbarIcon { ToolTipText = "TaskDock", Icon = Badge(_badge = "T"), ContextMenu = menu };
+        var tray = new TaskbarIcon { ToolTipText = "TaskDock", Icon = _shown = (System.Drawing.Icon)Badge(_badge = "T").Clone(), ContextMenu = menu };
         tray.TrayLeftMouseUp += (_, _) => { _userHidden = !_userHidden; UpdateVisibility(); };
         tray.ForceCreate(false);
         return tray;
@@ -281,7 +288,13 @@ public partial class App : Application
     {
         if (_tray == null || _vm == null) return;
         var text = _vm.DetectedCount > 0 ? Math.Min(_vm.DetectedCount, 9).ToString() : "T";
-        if (text != _badge) _tray.Icon = Badge(_badge = text);
+        if (text != _badge)
+        {
+            // The tray disposes the icon it's replacing, so it only ever gets a copy; the cache stays intact.
+            var previous = _shown;
+            _tray.Icon = _shown = (System.Drawing.Icon)Badge(_badge = text).Clone();
+            previous?.Dispose(); // ours to free too (Dispose is safe twice): at most one copy alive
+        }
         _tray.ToolTipText = $"TaskDock · {_vm.PillText}";
     }
 

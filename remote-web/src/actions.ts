@@ -42,7 +42,7 @@ async function send(live: Live, action: Action, approval?: ApprovalView): Promis
   let r: Result;
   try {
     if (choice && (choice === 'alwaysAllow' || approval?.risk !== 'read'))
-      action = { ...action, assertion: await fingerprint(live.token, action.approvalId as string, choice) };
+      action = { ...action, assertion: await fingerprint(live.token, { purpose: 'approval', approvalId: action.approvalId, choice }) };
     r = await live.request(id, action);
   } catch (e) {
     r = { id, ok: false, code: e instanceof DOMException && e.name === 'NotAllowedError' ? 'stepup_failed' : 'failed', error: e instanceof Error ? e.message : String(e) };
@@ -53,10 +53,10 @@ async function send(live: Live, action: Action, approval?: ApprovalView): Promis
 
 interface AssertionOptions { challenge: string; rpId?: string; timeout?: number; userVerification?: UserVerificationRequirement; allowCredentials?: { type: 'public-key'; id: string }[] }
 
-async function fingerprint(token: string, approvalId: string, choice: string): Promise<unknown> {
+async function fingerprint(token: string, purpose: object): Promise<unknown> {
   const res = await fetch('/api/stepup/options', {
     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ purpose: 'approval', approvalId, choice }),
+    body: JSON.stringify(purpose),
   });
   if (res.status === 409) throw Object.assign(new Error(messages.already_resolved), { code: 'already_resolved' });
   if (!res.ok) throw new Error(res.status === 429 ? messages.rate_limited! : 'Couldn’t start the fingerprint check.');
@@ -73,4 +73,33 @@ async function fingerprint(token: string, approvalId: string, choice: string): P
       userHandle: a.userHandle ? toB64(a.userHandle) : null,
     },
   };
+}
+
+export type Peek = { url?: string; error?: string; loading?: boolean };
+
+const peekErrors: Record<string, string> = {
+  minimized: 'That window is minimized on the PC.',
+  blank: 'Nothing to show. The PC may be locked or asleep.',
+  not_found: 'That window isn’t there any more.',
+  stepup_failed: 'Fingerprint check failed. Try again.',
+};
+
+/** A JPEG of the tile's window as a blob URL. Asks for the fingerprint only when the 5-minute grant has run out. */
+export async function peek(token: string, tileKey: string): Promise<Peek> {
+  const auth = { Authorization: `Bearer ${token}` };
+  const get = () => fetch(`/api/peek/${encodeURIComponent(tileKey)}`, { headers: auth });
+  try {
+    let res = await get();
+    if (res.status === 403) {
+      const assertion = await fingerprint(token, { purpose: 'peek' });
+      const grant = await fetch('/api/peek/grant', { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify({ assertion }) });
+      if (!grant.ok) return { error: peekErrors.stepup_failed };
+      res = await get();
+    }
+    if (res.ok) return { url: URL.createObjectURL(await res.blob()) };
+    const code = (await res.json().catch(() => ({})) as { code?: string }).code ?? '';
+    return { error: peekErrors[code] ?? (res.status === 429 ? 'One moment…' : 'Couldn’t capture that window.') };
+  } catch (e) {
+    return { error: e instanceof DOMException && e.name === 'NotAllowedError' ? peekErrors.stepup_failed : 'Couldn’t reach your PC.' };
+  }
 }

@@ -1,5 +1,5 @@
 # Builds every TaskDock deliverable into artifacts/release:
-#   TaskDock.exe                       self-contained single file (no .NET install needed)
+#   TaskDock.exe                       self-contained single file (no .NET install needed), with the phone app inside
 #   com.darkpixelgd.taskdock-<v>.tgz   Unity package (Package Manager → Add package from tarball)
 #   taskdock-<v>.vsix                  VS Code extension (Install from VSIX)
 #   taskdock-visualstudio-<v>.vsix     Visual Studio 2022 / 2026 extension (double-click, or VSIXInstaller)
@@ -15,6 +15,16 @@ function Run([string]$what, [scriptblock]$cmd) {
     Write-Host "== $what"
     & $cmd
     if ($LASTEXITCODE) { throw "$what failed (exit $LASTEXITCODE)" }
+}
+
+# First: TaskDock.Remote embeds remote-web/dist, so the phone app must be built before anything that compiles it.
+Run 'phone app (TaskDock Remote)' {
+    Push-Location (Join-Path $root 'remote-web')
+    try {
+        npm ci --no-audit --no-fund --silent
+        if (!$LASTEXITCODE) { npm test --silent }
+        if (!$LASTEXITCODE) { npm run build --silent }
+    } finally { Pop-Location }
 }
 
 Run 'tests (.NET)' { dotnet test (Join-Path $root 'TaskDock.sln') -c Release --nologo -v q }

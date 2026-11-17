@@ -1,4 +1,4 @@
-import { act, describe } from './actions.ts';
+import { act, describe, peek } from './actions.ts';
 import { h, replace } from './h.ts';
 import { clearPairing, loadPairing } from './idb.ts';
 import { Live } from './live.ts';
@@ -51,6 +51,8 @@ async function boot(): Promise<void> {
     activity: undefined as ActivityEntry[] | undefined,
     loadOlderActivity() { void loadActivity(true); },
     get alerts() { return alertsState(); },
+    peekState: undefined,
+    refreshPeek() { void loadPeek(); },
     async enableAlerts() { toast(await enableAlerts(token).catch((e: unknown) => e instanceof Error ? e.message : String(e))); draw(); },
     async unpair() {
       await fetch('/api/devices/self', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }).catch(() => undefined);
@@ -58,6 +60,18 @@ async function boot(): Promise<void> {
       location.replace('/');
     },
   };
+
+  async function loadPeek(): Promise<void> {
+    const key = route().startsWith('peek=') ? decodeURIComponent(route().slice(5)) : null;
+    if (!key) return;
+    if (ui.peekState?.url) URL.revokeObjectURL(ui.peekState.url);
+    ui.peekState = { loading: true };
+    draw();
+    const r = await peek(token, key);
+    if (route() !== `peek=${encodeURIComponent(key)}`) { if (r.url) URL.revokeObjectURL(r.url); return; } // left meanwhile
+    ui.peekState = r;
+    draw();
+  }
 
   async function loadActivity(older: boolean): Promise<void> {
     const last = ui.activity?.at(-1);
@@ -75,7 +89,13 @@ async function boot(): Promise<void> {
     if (s.status === 'live' && ids.join() !== approvalIds) { approvalIds = ids.join(); void closeHandled(new Set(ids)).catch(() => undefined); }
   });
   if (alertsState() === 'on') void subscribe(token).catch(() => undefined); // keep the PC's copy current
-  addEventListener('hashchange', () => { if (route() === 'activity') void loadActivity(false); draw(); scrollTo(0, 0); });
+  addEventListener('hashchange', () => {
+    if (route() === 'activity') void loadActivity(false);
+    if (route().startsWith('peek=')) void loadPeek();
+    else if (ui.peekState) { if (ui.peekState.url) URL.revokeObjectURL(ui.peekState.url); ui.peekState = undefined; }
+    draw();
+    scrollTo(0, 0);
+  });
   addEventListener('beforeinstallprompt', e => { e.preventDefault(); install = e as InstallPrompt; draw(); });
   setInterval(draw, 30_000); // approval countdowns and "Last seen" age
   if (route() === 'activity') void loadActivity(false);

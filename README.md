@@ -81,6 +81,34 @@ Each integration is optional, and each takes about a minute.
 
 New sources never add themselves. They wait under **+N detected** in the header (the tray icon shows the count) until you pin them.
 
+## Use TaskDock from your phone
+
+TaskDock Remote puts the widget on an Android phone: live tiles, approvals, Unity controls, downloads, presets and the media bar, at home or away. It runs over your own [Tailscale](https://tailscale.com) network. There's no TaskDock server and no account.
+
+**Set up once (about 10 minutes):**
+
+1. Install Tailscale on the PC and on the phone, and sign in to both with the same account.
+2. In the Tailscale admin console under **DNS**, turn on **MagicDNS** and **HTTPS Certificates**.
+3. Tray icon → **Phone (Remote)…**. Follow the checklist, then tick **Let my paired phones reach TaskDock**.
+4. Click **Pair a phone…**, scan the QR code with the phone and open it in Chrome. Confirm with your fingerprint, then click **Allow** on the PC.
+5. On the phone: Chrome menu → **Add to Home screen**. Then **⋯ → Turn on alerts** (notifications must be on for Chrome in Android settings).
+
+**What you can do from the phone:**
+
+- See every tile live, in the widget's order and colours.
+- Answer Claude Code approvals: read-only tools with one tap, anything that can change files with your fingerprint. A diff shows what an edit would change.
+- Play, pause and stop Unity; pause, resume and cancel downloads; pin, rename and launch tiles; apply presets; control the media bar.
+- **Peek** at a tile's window (fingerprint once per 5 minutes), **Lock** the PC, or put it to **Sleep**.
+- See everything a phone did under **Activity**, on the phone and in the Phone (Remote) window.
+
+**While you're away** (no keyboard or mouse for 3 minutes, adjustable):
+
+- Approvals and failures reach the locked phone as notifications. **Deny** works straight from the notification.
+- Approvals wait up to 10 minutes for you instead of 2. Restart Claude Code sessions that were running when you turned Remote on, so they pick up the longer wait.
+- The PC stays awake while work is running, then sleeps on its normal schedule.
+
+**Limits:** Android with Chrome only (an iPhone may work but isn't tested). A sleeping PC can't be woken from the phone. A Claude **Needs input** can't be answered remotely. Focus, Open and Show in folder stay on the PC. Your PC's Tailscale name becomes public in certificate transparency logs, as every HTTPS name does. Tailscale's free Personal plan is for non-commercial use.
+
 ## Features
 
 ### Integrations
@@ -174,8 +202,8 @@ Every source reports to a small server inside TaskDock that only listens on your
 
 ### Privacy and security
 
-- **Nothing leaves your PC.** No telemetry, no accounts, no network calls beyond your own machine.
-- **Only you can approve.** Approve and Deny are buttons in the widget. No network request can make that decision.
+- **Nothing leaves your PC unless you turn on Remote.** No telemetry, no accounts. With Remote on, your paired phones reach TaskDock over your own Tailscale network, and notifications go through Google's push service end-to-end encrypted: Google sees when and to which phone, not what they say.
+- **Only you can approve.** Approve and Deny are buttons in the widget, or on a phone you paired yourself. A phone needs to be on your tailnet, signed in as you, hold its own token, and, for anything that can change files, sign that exact request with its fingerprint passkey. Notifications never contain the command, a path or a file name.
 - **Locked to your machine.** The hub binds to `127.0.0.1`, needs a per-user token, rejects foreign `Host` headers (DNS rebinding) and never answers cross-origin requests. Browsers are accepted only from TaskDock's own extension.
 - **Downloads stay private.** The browser extension reports file names, sizes and progress, never URLs.
 - **Logs don't hold your work.** Prompts and tool inputs are never logged.
@@ -220,7 +248,7 @@ No. Only Claude Code has the hooks TaskDock needs. Screen-scraping the others wo
 It carries its own .NET runtime, so you don't have to install one, and it's left uncompressed on purpose: the compressed build is half the size but uses 110 MB of memory instead of 32 MB.
 
 **An approval card disappeared and the terminal asked me instead. Why?**
-An approval waits in the widget for 120 seconds by default (Settings → Approval hold). After that Claude Code's normal terminal prompt takes over, so nothing is ever stuck.
+An approval waits in the widget for 120 seconds by default (Settings → Approval hold), or up to 10 minutes while you're away with Remote on. After that Claude Code's normal terminal prompt takes over, so nothing is ever stuck. A card also disappears as soon as you answer in the terminal and Claude moves on.
 
 **Unity (or VS Code) says it can't reach TaskDock and `hub.json` is not found, but TaskDock is running.**
 That TaskDock was probably started from inside a packaged app, such as a terminal in the Claude desktop app. Windows then gives it a private copy of AppData that other apps can't see. Quit it from the tray and start TaskDock from the Start menu. The installer already launches it this way. Unity's Console logs one `[TaskDock]` line when it connects, and one per reason it can't.

@@ -15,7 +15,7 @@ public sealed class StoredCredential
 public sealed class Device
 {
     public required string Id { get; init; }
-    public required string Name { get; init; }
+    public required string Name { get; set; }
     public required string TokenSha256 { get; init; }
     public string Status { get; set; } = "pending"; // pending | active
     /// <summary>The Tailscale login that paired it; the first activated device's login becomes the owner.</summary>
@@ -107,6 +107,16 @@ public sealed class DeviceStore
             (_remote.VapidPublic, _remote.VapidPrivate) = (Base64Url([0x04, .. p.Q.X!, .. p.Q.Y!]), Base64Url(p.D!));
             Save();
             return (_remote.VapidPublic, _remote.VapidPrivate);
+        }
+    }
+
+    public void Rename(string deviceId, string name)
+    {
+        lock (_lock)
+        {
+            if (_devices.FirstOrDefault(d => d.Id == deviceId) is not { } d || name.Trim() is not { Length: > 0 and <= 40 } n) return;
+            d.Name = n;
+            Save();
         }
     }
 

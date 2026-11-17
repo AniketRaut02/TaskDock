@@ -47,6 +47,11 @@ sealed class FakeHost : IDockHost
     };
     public Task<DockResult> RunAsync(DockAction action) { lock (Ran) Ran.Add(action); return Task.FromResult(DockResult.Success); }
     public void Notice(string text) { lock (Notices) Notices.Add(text); }
+    public static readonly byte[] Jpeg = [0xFF, 0xD8, 0xFF, 0xD9];
+    public Task<(byte[]? Jpeg, string? Code)> PeekAsync(string tileKey) => Task.FromResult<(byte[]?, string?)>(tileKey switch
+    {
+        "unity|a" => (Jpeg, null), "unity|min" => (null, "minimized"), _ => (null, "not_found"),
+    });
 }
 
 /// <summary>A RemoteServer on a random loopback port, reached under the tailnet name like tailscale serve does.</summary>
@@ -171,8 +176,8 @@ sealed class SoftAuthenticator
         cose.WriteInt32(1); cose.WriteInt32(2);     // kty: EC2
         cose.WriteInt32(3); cose.WriteInt32(-7);    // alg: ES256
         cose.WriteInt32(-1); cose.WriteInt32(1);    // crv: P-256
-        cose.WriteInt32(-2); cose.WriteByteString(p.Q.X);
-        cose.WriteInt32(-3); cose.WriteByteString(p.Q.Y);
+        cose.WriteInt32(-2); cose.WriteByteString(p.Q.X!);
+        cose.WriteInt32(-3); cose.WriteByteString(p.Q.Y!);
         cose.WriteEndMap();
 
         var authData = new List<byte>();

@@ -203,6 +203,24 @@ public sealed class RemoteServer(RemoteOptions options, IDockHost host, DeviceSt
             return o != null ? Results.Content(o, "application/json")
                 : Results.Json(new { code }, statusCode: code switch { "rate_limited" => 429, "already_resolved" => 409, _ => 400 });
         }));
+        app.MapPost("/api/peek/grant", (Delegate)(async (HttpContext ctx) =>
+        {
+            if (Bearer(ctx) is not { IsActive: true } d) return Results.StatusCode(401);
+            var assertion = (await ReadJson(ctx))?["assertion"];
+            var ok = assertion is JsonObject && await Actions.GrantPeek(d, JsonSerializer.Deserialize<JsonElement>(assertion.ToJsonString()));
+            return ok ? Results.Ok(new { ok = true }) : Results.Json(new { code = "stepup_failed" }, statusCode: 403);
+        }));
+        app.MapGet("/api/peek/{tileKey}", (Delegate)(async (HttpContext ctx, string tileKey) =>
+        {
+            if (Bearer(ctx) is not { IsActive: true } d) return Results.StatusCode(401);
+            var (jpeg, code) = await Actions.Peek(d, tileKey);
+            ctx.Response.Headers.CacheControl = "no-store";
+            if (jpeg != null) return Results.Bytes(jpeg, "image/jpeg");
+            return Results.Json(new { code }, statusCode: code switch
+            {
+                "stepup_required" => 403, "rate_limited" => 429, "not_found" => 404, _ => 409, // minimized, blank
+            });
+        }));
         app.MapGet("/api/push/vapid", (HttpContext ctx) =>
             Bearer(ctx) is { IsActive: true } ? Results.Json(new { key = devices.Vapid().Public }) : Results.StatusCode(401));
         app.MapPost("/api/push/subscribe", (Delegate)(async (HttpContext ctx) =>

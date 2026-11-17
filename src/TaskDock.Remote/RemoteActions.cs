@@ -11,6 +11,8 @@ namespace TaskDock.Remote;
 sealed class RemoteActions(IDockHost host, StepUp stepUp, ActivityLog log, TimeProvider time)
 {
     const int PerSecond = 10, StepUpsPerMinute = 10, Remember = 256;
+    /// <summary>A Peek fingerprint is bound to this instead of an approval: it can't approve anything.</summary>
+    public const string PeekScope = "peek";
     static readonly TimeSpan RememberFor = TimeSpan.FromMinutes(10), RunTimeout = TimeSpan.FromSeconds(10);
 
     sealed class PerDevice
@@ -19,6 +21,8 @@ sealed class RemoteActions(IDockHost host, StepUp stepUp, ActivityLog log, TimeP
         public readonly Queue<DateTimeOffset> Actions = new(), StepUps = new();
         public readonly Dictionary<string, (JsonObject Result, DateTimeOffset At)> Done = [];
         public readonly Queue<string> DoneOrder = new();
+        public DateTimeOffset PeekUntil, LastPeek;
+        public readonly SemaphoreSlim PeekGate = new(1, 1);
     }
 
     readonly ConcurrentDictionary<string, PerDevice> _devices = new();
@@ -93,12 +97,41 @@ sealed class RemoteActions(IDockHost host, StepUp stepUp, ActivityLog log, TimeP
     public (string? Options, string? Code) StepUpOptions(Device device, JsonObject? body)
     {
         string? Str(string k) => body?[k]?.GetValueKind() == JsonValueKind.String ? body[k]!.GetValue<string>() : null;
-        if (Str("purpose") != "approval" || Str("approvalId") is not { Length: > 0 and <= 128 } approvalId || Str("choice") is not ("allow" or "alwaysAllow") || device.Credential == null)
-            return (null, "invalid");
+        var purpose = Str("purpose");
+        if (device.Credential == null || purpose is not ("approval" or "peek")) return (null, "invalid");
+        if (purpose == "approval" && (Str("approvalId") is not { Length: > 0 and <= 128 } || Str("choice") is not ("allow" or "alwaysAllow"))) return (null, "invalid");
         var d = _devices.GetOrAdd(device.Id, _ => new PerDevice());
         lock (d.StepUps) if (!Allow(d.StepUps, time.GetUtcNow(), StepUpsPerMinute, TimeSpan.FromMinutes(1))) return (null, "rate_limited");
-        if (host.Approval(approvalId) is not { } approval) return (null, "already_resolved");
-        return (stepUp.Options(device, approvalId, approval.ToolInputJson, Str("choice")!), null);
+        if (purpose == "peek") return (stepUp.Options(device, PeekScope, "", PeekScope), null);
+        if (host.Approval(Str("approvalId")!) is not { } approval) return (null, "already_resolved");
+        return (stepUp.Options(device, approval.Id, approval.ToolInputJson, Str("choice")!), null);
+    }
+
+    /// <summary>A fingerprint for purpose "peek" gives this phone 5 minutes of Peek.</summary>
+    public async Task<bool> GrantPeek(Device device, JsonElement assertion)
+    {
+        if (!await stepUp.Verify(device, PeekScope, "", PeekScope, assertion)) return false;
+        _devices.GetOrAdd(device.Id, _ => new PerDevice()).PeekUntil = time.GetUtcNow() + TimeSpan.FromMinutes(5);
+        return true;
+    }
+
+    /// <summary>One window capture: needs a Peek grant; one at a time per phone, at most one a second. Never cached.</summary>
+    public async Task<(byte[]? Jpeg, string? Code)> Peek(Device device, string tileKey)
+    {
+        var d = _devices.GetOrAdd(device.Id, _ => new PerDevice());
+        var now = time.GetUtcNow();
+        if (now >= d.PeekUntil) return (null, "stepup_required");
+        if (!d.PeekGate.Wait(0)) return (null, "rate_limited");
+        try
+        {
+            if (now - d.LastPeek < TimeSpan.FromSeconds(1)) return (null, "rate_limited");
+            d.LastPeek = now;
+            var r = await host.PeekAsync(tileKey);
+            var label = host.Snapshot?.Tiles.Concat(host.Snapshot.Detected).FirstOrDefault(t => t.Key == tileKey)?.Label ?? tileKey;
+            log.Add(new ActivityEntry(now, device.Id, device.Name, "peek", label, r.Jpeg != null, r.Code));
+            return r;
+        }
+        finally { d.PeekGate.Release(); }
     }
 
     static bool Allow(Queue<DateTimeOffset> recent, DateTimeOffset now, int max, TimeSpan window)
@@ -150,6 +183,8 @@ sealed class RemoteActions(IDockHost host, StepUp stepUp, ActivityLog log, TimeP
             MediaSelect m => ("Switched the media bar", m.AppId),
             MediaPin m => ($"{(m.On ? "Pinned" : "Unpinned")} {player}", player),
             MediaSearchAction m => ($"Searched {m.Target}", m.Target), // the query itself stays out of the log
+            PowerLock => ("Locked the PC", "PC"),
+            PowerSleep => ("Putting the PC to sleep", "PC"),
             _ => ("Ran an action", a.GetType().Name),
         };
     }

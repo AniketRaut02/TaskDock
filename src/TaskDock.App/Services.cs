@@ -37,6 +37,10 @@ sealed class AppSettings
     public string LastPreset { get; set; } = "Default";
     /// <summary>TaskDock Remote: serve the phone app on this PC's tailnet name.</summary>
     public bool RemoteEnabled { get; set; }
+    /// <summary>Away mode starts after this long without keyboard or mouse input (1–30).</summary>
+    public int AwayAfterMinutes { get; set; } = 3;
+    /// <summary>Push approvals and failures to paired phones while Away.</summary>
+    public bool PhoneAlerts { get; set; } = true;
     /// <summary>Centre of the widget in screen pixels; picks the monitor on startup.</summary>
     public int? AnchorX { get; set; }
     public int? AnchorY { get; set; }

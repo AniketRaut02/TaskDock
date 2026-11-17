@@ -72,6 +72,8 @@ public class ActionRouterTests
         public Task MediaSelect(string appId) { Calls.Add("select " + appId); return Task.CompletedTask; }
         public Task MediaPin(bool on) { Calls.Add("mediaPin " + on); return Task.CompletedTask; }
         public void MediaSearch(SearchTarget target, string query) => Calls.Add($"search {target} {query}");
+        public void Lock() => Calls.Add("lock");
+        public void Sleep() => Calls.Add("sleep");
     }
 
     static readonly string Long501 = new('x', 501), Long65 = new('x', 65), Long101 = new('x', 101);
@@ -155,6 +157,10 @@ public class ActionRouterTests
         { """{"type":"media.search","target":"spotify","query":"  "}""", "invalid", null },
         { $$"""{"type":"media.search","target":"spotify","query":"{{Long101}}"}""", "invalid", null },
 
+        { """{"type":"power.lock"}""", "ok", "lock" },
+        { """{"type":"power.sleep","confirm":true}""", "ok", "sleep" },
+        { """{"type":"power.sleep","confirm":false}""", "invalid", null },
+        { """{"type":"power.sleep"}""", "invalid", null },
         { """{"type":"power.format"}""", "invalid", null },
         { """{"approvalId":"read"}""", "invalid", null },
         { """{"type":"tile.ack","tileKey":42}""", "invalid", null },
@@ -192,6 +198,8 @@ public class ActionRouterTests
     [InlineData("""{"type":"approval.deny","approvalId":"risky"}""", Requirement.None)]
     [InlineData("""{"type":"approval.terminal","approvalId":"risky"}""", Requirement.None)]
     [InlineData("""{"type":"adapter.command","tileKey":"unity|idle","command":"enterPlay"}""", Requirement.None)]
+    [InlineData("""{"type":"power.sleep","confirm":true}""", Requirement.Confirm)]
+    [InlineData("""{"type":"power.lock"}""", Requirement.None)]
     public void Fingerprint_only_where_the_security_model_asks(string json, Requirement want) =>
         Assert.Equal(want, ActionRouter.Requirement(DockAction.Parse(JsonDocument.Parse(json).RootElement).Item1!, new FakeOps()));
 
@@ -229,5 +237,7 @@ public class ActionRouterTests
         public Task MediaSelect(string appId) => Task.CompletedTask;
         public Task MediaPin(bool on) => Task.CompletedTask;
         public void MediaSearch(SearchTarget target, string query) { }
+        public void Lock() { }
+        public void Sleep() { }
     }
 }

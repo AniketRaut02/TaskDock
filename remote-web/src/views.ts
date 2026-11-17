@@ -1,4 +1,4 @@
-import type { Action } from './actions.ts';
+import type { Action, Peek } from './actions.ts';
 import type { ApprovalView, Item, MediaView, Snapshot, TileView } from './delta.ts';
 import { editsOf, diffLines } from './diff.ts';
 import { h, replace } from './h.ts';
@@ -14,6 +14,8 @@ export interface Ui {
   unpair(): void;
   readonly alerts: 'on' | 'off' | 'blocked' | 'unsupported';
   enableAlerts(): void;
+  peekState?: Peek;
+  refreshPeek(): void;
 }
 
 export interface ActivityEntry { ts: string; deviceName: string; type: string; target: string; ok: boolean; code?: string; preview?: string }
@@ -40,6 +42,7 @@ export function render(root: HTMLElement, s: LiveState, route: string, ui: Ui): 
   else if (route.startsWith('approval=')) body = approvalDetail(snap, decodeURIComponent(route.slice(9)), ui);
   else if (route === 'menu') body = menu(snap, s, ui);
   else if (route === 'activity') body = activity(ui);
+  else if (route.startsWith('peek=')) body = peekView(snap, decodeURIComponent(route.slice(5)), ui);
   else body = h('main', {},
     needsYou(snap, ui),
     section('Tiles', snap.tiles.map(t => tile(t, ui))),
@@ -115,6 +118,7 @@ function tile(t: TileView, ui: Ui): HTMLElement {
     c.pause ? button(ui, c.pauseText, { type: 'adapter.command', tileKey: t.key, command: 'togglePause' }) : null,
     c.stop ? button(ui, 'Stop', { type: 'adapter.command', tileKey: t.key, command: 'exitPlay' }) : null,
     c.launch && pin ? button(ui, 'Launch', { type: 'tile.launch', pinId: pin }) : null,
+    c.peek ? h('button', { class: 'ghost', type: 'button', onclick: () => ui.go(`peek=${encodeURIComponent(t.key)}`) }, 'Peek') : null,
     c.ack ? button(ui, 'Clear', { type: 'tile.ack', tileKey: t.key }) : null,
     c.pin ? button(ui, 'Pin', { type: 'tile.pin', tileKey: t.key }, { cls: 'ghost' }) : null,
     pin ? labelled(button(ui, t.notify ? '🔔' : '🔕', { type: 'tile.notify', pinId: pin, on: !t.notify }, { cls: 'ghost' }),
@@ -179,6 +183,16 @@ function menu(s: Snapshot, live: LiveState, ui: Ui): HTMLElement {
         button(ui, 'Merge', { type: 'preset.apply', name: n, merge: true }, { cls: 'ghost' }))),
       button(ui, 'Launch missing apps', { type: 'preset.launchMissing' }),
     ]),
+    section('This PC', [
+      button(ui, 'Lock PC', { type: 'power.lock' }),
+      h('button', {
+        class: 'danger', type: 'button',
+        onclick: (e: Event) => {
+          if (confirm('Put the PC to sleep?\n\nYour phone can’t wake the PC again. Someone has to press a key or the power button.'))
+            void ui.run(e.currentTarget as HTMLElement, { type: 'power.sleep', confirm: true });
+        },
+      }, 'Sleep PC'),
+    ]),
     section('This phone', [
       h('p', {}, live.deviceName ?? 'This phone'),
       ui.alerts === 'on' ? h('p', { class: 'muted' }, 'Alerts are on: approvals and failures reach this phone when you’re away from the PC.')
@@ -201,6 +215,18 @@ function activity(ui: Ui): HTMLElement {
           h('div', { class: 'muted' }, `${e.target} · ${e.deviceName} · ${e.ok ? 'ok' : e.code ?? 'failed'}`),
           e.preview ? h('code', { class: 'preview' }, e.preview) : null))),
     list?.length ? h('button', { class: 'ghost', type: 'button', onclick: ui.loadOlderActivity }, 'Older') : null);
+}
+
+function peekView(s: Snapshot, key: string, ui: Ui): HTMLElement {
+  const t = [...s.tiles, ...s.detected].find(x => x.key === key);
+  const p = ui.peekState;
+  return h('main', { class: 'detail' },
+    h('div', { class: 'row' },
+      h('button', { class: 'ghost', type: 'button', onclick: () => ui.go('') }, '← Back'),
+      h('button', { class: 'ghost', type: 'button', onclick: ui.refreshPeek, disabled: p?.loading ?? false }, p?.loading ? 'Capturing…' : 'Refresh')),
+    h('h2', { class: 'tool' }, t?.label ?? 'Window'),
+    p?.error ? h('p', { class: 'muted' }, p.error) : null,
+    p?.url ? h('img', { class: 'peek', src: p.url, alt: `Screenshot of ${t?.label ?? 'the window'}` }) : null);
 }
 
 export function toast(text: string): void {

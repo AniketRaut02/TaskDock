@@ -34,6 +34,8 @@ public enum Requirement { None, Confirm, Fingerprint }
 [JsonDerivedType(typeof(MediaSelect), "media.select")]
 [JsonDerivedType(typeof(MediaPin), "media.pin")]
 [JsonDerivedType(typeof(MediaSearchAction), "media.search")]
+[JsonDerivedType(typeof(PowerLock), "power.lock")]
+[JsonDerivedType(typeof(PowerSleep), "power.sleep")]
 public abstract record DockAction
 {
     /// <summary>Null when the arguments are well-formed; otherwise why not.</summary>
@@ -93,6 +95,10 @@ public sealed record MediaSearchAction(string Target, string Query) : DockAction
         : string.IsNullOrWhiteSpace(Query) || Query.Length > 100 ? "query must be 1 to 100 characters" : null;
 }
 
+public sealed record PowerLock : DockAction;
+/// <summary>Needs confirm: true, sent only after the phone showed "Your phone can't wake the PC again".</summary>
+public sealed record PowerSleep(bool Confirm) : DockAction { public override string? Invalid() => Confirm ? null : "confirm first"; }
+
 public sealed record DockResult(bool Ok, string? Code = null, string? Error = null)
 {
     public static readonly DockResult Success = new(true);
@@ -128,6 +134,9 @@ public interface IDockOps
     Task MediaSelect(string appId);
     Task MediaPin(bool on);
     void MediaSearch(SearchTarget target, string query);
+    void Lock();
+    /// <summary>Puts the PC to sleep a few seconds later, so the result still reaches the phone.</summary>
+    void Sleep();
 }
 
 /// <summary>Runs one catalog action after re-checking it against live state, so a phone acting on an old view gets "stale".</summary>
@@ -137,6 +146,7 @@ public static class ActionRouter
     public static Requirement Requirement(DockAction action, IDockOps ops) => action switch
     {
         ApprovalAlwaysAllow => Dock.Requirement.Fingerprint,
+        PowerSleep => Dock.Requirement.Confirm,
         // An approval we can't see is treated as risky: never one tap by default.
         ApprovalAllow a => ops.Approval(a.ApprovalId) is { } p && ToolRisk.Classify(p.ToolName) == Risk.Read ? Dock.Requirement.None : Dock.Requirement.Fingerprint,
         _ => Dock.Requirement.None,
@@ -227,6 +237,9 @@ public static class ActionRouter
             case MediaSearchAction s:
                 ops.MediaSearch(s.SearchTarget!.Value, s.Query.Trim());
                 return DockResult.Success;
+
+            case PowerLock: ops.Lock(); return DockResult.Success;
+            case PowerSleep: ops.Sleep(); return DockResult.Success;
 
             default: return DockResult.Fail("invalid", "unknown action");
         }

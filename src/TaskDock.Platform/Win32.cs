@@ -81,6 +81,17 @@ public static partial class Win32
     /// </summary>
     public static void KeepSystemAwake(bool on) => SetThreadExecutionState(on ? ES_CONTINUOUS | ES_SYSTEM_REQUIRED : ES_CONTINUOUS);
 
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool PrintWindow(nint h, nint hdc, uint flags);
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool IsIconic(nint h);
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static partial bool LockWorkStation();
+    [LibraryImport("powrprof.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool SetSuspendState([MarshalAs(UnmanagedType.Bool)] bool hibernate, [MarshalAs(UnmanagedType.Bool)] bool force, [MarshalAs(UnmanagedType.Bool)] bool wakeupEventsDisabled);
+    /// <summary>PrintWindow flag: render content drawn by DirectX/DWM too (spike S5: Unity, Visual Studio, Chrome, Electron).</summary>
+    public const uint PW_RENDERFULLCONTENT = 2;
+
+    /// <summary>Sleep, not hibernate; wake timers stay allowed.</summary>
+    public static bool Sleep() => SetSuspendState(false, false, false);
+
     /// <summary>A fullscreen D3D app, presentation mode or "busy" (e.g. a fullscreen video).</summary>
     public static bool SomethingIsFullscreen() =>
         SHQueryUserNotificationState(out var s) == 0 && s is 2 /*BUSY*/ or 3 /*D3D_FULL_SCREEN*/ or 4 /*PRESENTATION_MODE*/;

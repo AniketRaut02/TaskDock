@@ -12,9 +12,9 @@ namespace TaskDock.App;
 /// Turns TaskDock Remote on and off (checks Tailscale, starts RemoteServer, points `tailscale serve` at it), and runs
 /// Away mode: who is at the PC, how long approvals wait, pushes to locked phones, and keeping the PC awake.
 /// </summary>
-sealed class RemoteControl(DockHost dock, Action holdChanged)
+sealed class RemoteControl(DockHost dock, AppSettings settings, Action holdChanged)
 {
-    public static readonly TimeSpan AwayAfter = TimeSpan.FromSeconds(180);
+    TimeSpan AwayAfter => TimeSpan.FromMinutes(Math.Clamp(settings.AwayAfterMinutes, 1, 30));
     public const int RemoteHoldSeconds = 600;
 
     int _httpsPort = 443;
@@ -104,5 +104,5 @@ sealed class RemoteControl(DockHost dock, Action holdChanged)
     }
 
     /// <summary>A push to locked phones, if the push policy says so (only while Away).</summary>
-    public void Notify(PushMessageFor m, bool quietHours) => Server?.Notify(m, Away, quietHours);
+    public void Notify(PushMessageFor m, bool quietHours) { if (settings.PhoneAlerts) Server?.Notify(m, Away, quietHours); }
 }

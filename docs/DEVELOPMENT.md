@@ -134,6 +134,21 @@ The hub follows the hooks docs: an empty 200 means no decision, an HTTP failure 
 | S5 | **Pass** | `PrintWindow(PW_RENDERFULLCONTENT)` gives a real image for Unity 6.5 (DX12, Game view included), Visual Studio 2026, Chrome and Electron (Claude desktop; VS Code is Electron too but was not installed), including windows fully covered by others, and **also with the PC locked** (captured 9 s after `LockWorkStation`). Minimized windows give a 159×27 title-bar stub: keep the 409 `minimized` check, and keep the `blank` check for cases not seen here (sleep, a disconnected display). The capturing process must be per-monitor DPI aware, or `GetWindowRect` is scaled and the image is cropped (1550×830 instead of 1938×1038 at 125%). Windows.Graphics.Capture fallback not needed |
 | S6 | **Pass** | A second idle `CreateSlimBuilder` Kestrel app adds 1.3–2.3 MB private memory (3 runs, 1 app 14.8–15.0 MB vs 2 apps 16.1–17.3 MB, framework-dependent build). Budget 10 MB: keep `RemoteServer` as its own app |
 
+## Remote (0.2.0) layout
+
+The phone is a second view of the same state, not a second brain: every rule and action lives once, in Core.
+
+| Where | What |
+| --- | --- |
+| `src/TaskDock.Core/Dock/` | `TileCaps`, `DockSnapshot` + `SnapshotBuilder`, the action catalog (`DockAction`) and `ActionRouter` (re-checks each action against live state), `HoldRule`, `PushPolicy` |
+| `src/TaskDock.Core/Claude/ToolRisk.cs` | Read-only allowlist; any other tool needs a fingerprint |
+| `src/TaskDock.Remote/` | `RemoteServer` (Kestrel on 127.0.0.1:47830–47839, the request checks, pairing, routes), `LiveSession` + `DeltaEncoder` (the socket), `RemoteActions` (rate limit, dedup, step-up, Peek grant, log, hints), `StepUp` (WebAuthn bound to one request), `DeviceStore`, `ActivityLog`, `PushSender`, `TailscaleStatus`. References Core only; reaches the app through `IDockHost` |
+| `src/TaskDock.App/` | `DockHost` (the `IDockHost`; actions run on the UI thread through the widget's own methods), `RemoteControl` (on/off, Away mode, hold hand-back, keep awake, pushes), `RemoteWindow` (setup checklist), `TailscaleCli`, `WindowCapture` |
+| `remote-web/` | The phone app: plain TypeScript, esbuild, served from embedded resources. `delta.ts` (protocol), `live.ts` (socket), `actions.ts` (fingerprints, Peek), `push.ts`, `sw.ts` (service worker), `views.ts` (all DOM through `h()`, text only) |
+| `protocol/remote/samples/` | Golden snapshot and delta, read by C# and `node --test` |
+
+Data lives in `%LOCALAPPDATA%\TaskDock\remote\`: `devices.json` (token hashes, passkeys, push subscriptions), `remote.json` (owner login, VAPID keys) and `activity-YYYY-MM.jsonl`.
+
 ## Remote (0.2.0) gates
 
 - **Phase 1, 16 Nov 2026: pass.** 204 tests. Release builds of 0.1.4 and this branch render the widget identically under FakeAdapter `showcase` and `claude`; idle memory 53.4 vs 52.3 MB (3 runs each).

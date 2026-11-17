@@ -110,4 +110,24 @@ sealed class DockHost : IDockOps, Remote.IDockHost
     public Task MediaSelect(string appId) => _vm.Media?.Select(appId) ?? Task.CompletedTask;
     public Task MediaPin(bool on) => _vm.Media?.SetPinned(on) ?? Task.CompletedTask;
     public void MediaSearch(SearchTarget target, string query) => _vm.Media?.Search(target, query);
+
+    public void Lock()
+    {
+        Serilog.Log.Information("Locking the PC (from a phone)");
+        Platform.Win32.LockWorkStation();
+    }
+
+    public void Sleep()
+    {
+        Serilog.Log.Information("Sleeping in 3 s (from a phone)");
+        _ = Task.Delay(3000).ContinueWith(_ => Platform.Win32.Sleep(), TaskScheduler.Default); // the result reaches the phone first
+    }
+
+    /// <summary>Only tiles whose caps allow Peek, via the same window lookup Focus uses. The capture runs off the UI thread.</summary>
+    public async Task<(byte[]? Jpeg, string? Code)> PeekAsync(string tileKey)
+    {
+        var hwnd = await _ui.InvokeAsync(() =>
+            _vm.Registry.Get(tileKey) is { } t && TileCaps.For(t, _vm.PinOf(t)).Peek ? _vm.WindowOf(t) : 0);
+        return hwnd == 0 ? (null, "not_found") : await Task.Run(() => WindowCapture.Capture(hwnd));
+    }
 }

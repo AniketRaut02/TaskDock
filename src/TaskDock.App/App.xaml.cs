@@ -127,7 +127,7 @@ public partial class App : Application
         _vm.Hint += text => _tray.ShowNotification("TaskDock", text);
         await _vm.Media.StartAsync();
 
-        _remote = new RemoteControl(_dock, ApplyHold);
+        _remote = new RemoteControl(_dock, _settings, ApplyHold);
         var remote = _remote;
         _dock.DeadlineOf = p => remote.Deadline(p, TimeSpan.FromSeconds(_settings.HoldSeconds));
         _dock.Flags = () => new FlagsView(remote.Away, remote.KeepingAwake);

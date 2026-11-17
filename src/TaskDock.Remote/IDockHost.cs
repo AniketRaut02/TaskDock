@@ -18,4 +18,6 @@ public interface IDockHost
     Task<DockResult> RunAsync(DockAction action);
     /// <summary>The widget's normal hint, so remote control is never invisible at the PC.</summary>
     void Notice(string text);
+    /// <summary>A JPEG of the tile's window, or why not: not_found, minimized, blank.</summary>
+    Task<(byte[]? Jpeg, string? Code)> PeekAsync(string tileKey);
 }

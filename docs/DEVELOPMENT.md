@@ -160,15 +160,14 @@ Data lives in `%LOCALAPPDATA%\TaskDock\remote\`: `devices.json` (token hashes, p
   - Found and fixed during the gate: the preset list never loaded (an overflow in the 5 s cache check, from Phase 1); a double tap could send two requests when a redraw replaced the button (identical taps within 1.5 s now share one); a half-open socket swallowed taps silently (server `KeepAliveTimeout` 30 s, and the app reconnects when a tap gets no answer in 10 s).
   - Not done by hand: Play on a tile that is already Playing → `stale` (the phone redraws within 250 ms, so the race can't be hit by tapping); covered by ActionRouterTests and the server path.
 
-- **Phases 4 and 5: not yet run on a phone.** Code complete (0.2.0); automated tests pass. To check by hand, in one sitting:
-  - Phone locked, PC untouched 3 minutes: a new approval notifies within 5 s; **Deny** from the notification resolves it; a second approval answered on the PC first gives "Already handled on the PC".
-  - At the PC: no notification. With the app open: no notification, but the in-app banner shows the new approval.
-  - Away: an approval is still answerable at minute 9 and goes back to the terminal after 10. Coming back to the PC hands it back after `HoldSeconds`, counted from your return.
-  - Answered in the terminal: the card clears when Claude finishes the turn.
-  - Keep awake (quick check chosen): during an Away run with a Busy tile, the log shows `Keep awake: True`, then `False` once you're back or the work ends.
-  - Peek on Unity, Visual Studio and VS Code; a minimized window says so. **Lock** locks the PC; **Sleep** sleeps it and the phone shows it offline.
-  - Setup wizard: each step's fix; rename and revoke a phone; Away-after minutes; alerts off stops pushes.
-  - Still open from the plan: setup from a clean Windows user account in under 15 minutes; the 30-minute soak with two phones; whether `tailscale serve` survives a reboot.
+- **Phases 4 and 5, 17 Nov 2026: pass**, same phone (renamed "Samsung" from the setup checklist).
+  - Setup checklist: all five steps green; rename works; **Turn on alerts** registered an FCM subscription.
+  - Peek: Unity (DX12) and Visual Studio captured, Refresh reused the 5-minute grant, a minimized Unity window answered `minimized`. **Lock** locked the PC; **Sleep** slept it and the phone showed it offline. A Pin tapped just after the same tile was pinned on the PC came back `stale`, the gate's "acting on an old view" case, now seen for real.
+  - Away mode: Away logged 3 minutes after the last input (10:30:20), keep-awake on. A Bash approval reached the locked phone and **Deny from the notification** returned `deny` with "Denied from phone". An Edit approval held while Away was allowed from the phone at exactly 9:00. Keep-awake followed the rule (off when nothing was running or waiting, on again with an approval held), checked in the log rather than with a real sleep timeout.
+  - Back at the PC: Present logged and keep-awake off at once; approvals sent no push and went back to the terminal after 121 s (`HoldSeconds` 120).
+  - Found and fixed: the in-app banner never showed, because every redraw replaced the toast element; it now lives outside the redrawn root.
+  - Not checked by hand: the 10-minute fallback itself (hub tests cover the hold expiry), "alerts off stops pushes", and the terminal-answer clearing (HubTests cover Stop, UserPromptSubmit and SessionEnd).
+  - Still open from the plan: setup from a clean Windows user account in under 15 minutes; the 30-minute soak with two phones; whether `tailscale serve` survives a reboot; VS Code Peek (VS Code isn't installed on the dev PC).
 
 Run the remote tests with `dotnet test` (TaskDock.Remote.Tests) and `npm test` in `remote-web`. `npm run build` there writes `remote-web/dist`, which TaskDock.Remote embeds; without it the server serves a page saying the app wasn't built.
 

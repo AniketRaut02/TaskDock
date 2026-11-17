@@ -49,7 +49,7 @@ export function render(root: HTMLElement, s: LiveState, route: string, ui: Ui): 
     snap.detected.length ? h('details', {}, h('summary', {}, `${snap.detected.length} detected`), ...snap.detected.map(t => tile(t, ui))) : null);
 
   if (!live) { body.classList.add('stale'); body.setAttribute('aria-disabled', 'true'); }
-  replace(root, header(s, ui), body, snap?.media && route === '' ? media(snap.media, ui) : null, h('div', { id: 'toast', role: 'alert' }));
+  replace(root, header(s, ui), body, snap?.media && route === '' ? media(snap.media, ui) : null);
 }
 
 function header(s: LiveState, ui: Ui): HTMLElement {
@@ -229,9 +229,10 @@ function peekView(s: Snapshot, key: string, ui: Ui): HTMLElement {
     p?.url ? h('img', { class: 'peek', src: p.url, alt: `Screenshot of ${t?.label ?? 'the window'}` }) : null);
 }
 
+/** Lives outside the redrawn root: every update replaces the screen, and would wipe a banner straight away. */
 export function toast(text: string): void {
-  const t = document.getElementById('toast');
-  if (!t) return;
+  let t = document.getElementById('toast');
+  if (!t) document.body.appendChild(t = h('div', { id: 'toast', role: 'alert' }));
   replace(t, text);
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 4000);

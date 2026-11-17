@@ -61,3 +61,4 @@ pre.input, pre.diff { background: #000; border-radius: 8px; padding: 10px; font-
 #toast { position: fixed; left: 16px; right: 16px; bottom: 210px; padding: 12px 14px; border-radius: 10px; background: #2a2b31; box-shadow: 0 4px 20px #0008; opacity: 0; transform: translateY(8px); transition: opacity .2s, transform .2s; pointer-events: none; z-index: 2; }
 #toast.show { opacity: 1; transform: none; }
 .peek { display: block; width: 100%; height: auto; margin-top: 12px; border-radius: 8px; border: 1px solid var(--line); }
+#toast { white-space: pre-line; }

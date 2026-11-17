@@ -138,6 +138,7 @@ public partial class App : Application
             Log.Warning("Remote stayed off: {Problem}", problem);
             _vm.ShowHint("Phone access is off: " + problem);
         }
+        if (_remote.Server?.HostChanged == true) _vm.ShowHint(HostChangedText);
 
         // Drain on the UI thread at 10 Hz: every event reaches Notify, the UI repaints once per tick.
         var approvalsChanged = 1;
@@ -327,6 +328,8 @@ public partial class App : Application
     /// How long the hub holds an approval. With Remote on it's always the maximum, because Claude Code fixes the hook timeout
     /// when a session starts; Away mode then decides the real wait (RemoteControl.Tick hands it back sooner at the PC).
     /// </summary>
+    internal const string HostChangedText = "This PC's Tailscale name changed, so your phones' passkeys no longer fit. Pair them again in Phone (Remote).";
+
     int HubHoldSeconds => _remote?.Server != null ? RemoteControl.RemoteHoldSeconds : _settings.HoldSeconds;
 
     void ApplyHold()

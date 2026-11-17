@@ -160,6 +160,16 @@ Data lives in `%LOCALAPPDATA%\TaskDock\remote\`: `devices.json` (token hashes, p
   - Found and fixed during the gate: the preset list never loaded (an overflow in the 5 s cache check, from Phase 1); a double tap could send two requests when a redraw replaced the button (identical taps within 1.5 s now share one); a half-open socket swallowed taps silently (server `KeepAliveTimeout` 30 s, and the app reconnects when a tap gets no answer in 10 s).
   - Not done by hand: Play on a tile that is already Playing → `stale` (the phone redraws within 250 ms, so the race can't be hit by tapping); covered by ActionRouterTests and the server path.
 
+- **Phases 4 and 5: not yet run on a phone.** Code complete (0.2.0); automated tests pass. To check by hand, in one sitting:
+  - Phone locked, PC untouched 3 minutes: a new approval notifies within 5 s; **Deny** from the notification resolves it; a second approval answered on the PC first gives "Already handled on the PC".
+  - At the PC: no notification. With the app open: no notification, but the in-app banner shows the new approval.
+  - Away: an approval is still answerable at minute 9 and goes back to the terminal after 10. Coming back to the PC hands it back after `HoldSeconds`, counted from your return.
+  - Answered in the terminal: the card clears when Claude finishes the turn.
+  - Keep awake (quick check chosen): during an Away run with a Busy tile, the log shows `Keep awake: True`, then `False` once you're back or the work ends.
+  - Peek on Unity, Visual Studio and VS Code; a minimized window says so. **Lock** locks the PC; **Sleep** sleeps it and the phone shows it offline.
+  - Setup wizard: each step's fix; rename and revoke a phone; Away-after minutes; alerts off stops pushes.
+  - Still open from the plan: setup from a clean Windows user account in under 15 minutes; the 30-minute soak with two phones; whether `tailscale serve` survives a reboot.
+
 Run the remote tests with `dotnet test` (TaskDock.Remote.Tests) and `npm test` in `remote-web`. `npm run build` there writes `remote-web/dist`, which TaskDock.Remote embeds; without it the server serves a page saying the app wasn't built.
 
 ## Soak

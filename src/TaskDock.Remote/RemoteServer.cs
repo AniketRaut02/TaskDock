@@ -72,8 +72,12 @@ public sealed class RemoteServer(RemoteOptions options, IDockHost host, DeviceSt
     public int Port { get; private set; }
     public DeviceStore Devices => devices;
 
+    /// <summary>The PC's tailnet name changed since phones were paired: they were dropped and must pair again.</summary>
+    public bool HostChanged { get; private set; }
+
     public async Task StartAsync()
     {
+        HostChanged = devices.UseHost(options.HostName);
         var ports = options.BasePort == 0 ? [0] : Enumerable.Range(options.BasePort, options.PortSpan);
         foreach (var port in ports)
         {

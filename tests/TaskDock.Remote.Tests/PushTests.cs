@@ -148,3 +148,26 @@ public class PushTests
         Assert.Null(new DeviceStore(h.Dir).Devices.Single().Push); // and it's gone from disk
     }
 }
+
+public class HostNameTests
+{
+    [Fact]
+    public async Task Renaming_the_pc_drops_phones_whose_passkeys_no_longer_fit()
+    {
+        var h = await Harness.Start();
+        var (token, _, _) = await h.Pair();
+        Assert.False(h.Server.HostChanged); // the first start just records the name
+        await h.Server.DisposeAsync();
+
+        var same = new DeviceStore(h.Dir);
+        Assert.False(same.UseHost(Harness.Name.ToUpperInvariant()));
+        Assert.NotNull(same.ByToken(token));
+
+        var renamed = new DeviceStore(h.Dir);
+        Assert.True(renamed.UseHost("newpc.tail1234.ts.net"));
+        Assert.Empty(renamed.Devices);
+        Assert.Empty(new DeviceStore(h.Dir).Devices); // saved
+        Assert.False(new DeviceStore(h.Dir).UseHost("newpc.tail1234.ts.net"));
+        Directory.Delete(h.Dir, true);
+    }
+}

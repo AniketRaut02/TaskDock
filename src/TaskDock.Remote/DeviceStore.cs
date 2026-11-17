@@ -41,6 +41,8 @@ public sealed class DeviceStore
     sealed class RemoteFile
     {
         public string? OwnerLogin { get; set; }
+        /// <summary>The tailnet name the passkeys were made for (their relying party ID).</summary>
+        public string? HostName { get; set; }
         public string? VapidPublic { get; set; }  // base64url, uncompressed P-256 point
         public string? VapidPrivate { get; set; } // base64url; same trust as hub.json's token (only this Windows user can read it)
     }
@@ -60,6 +62,23 @@ public sealed class DeviceStore
     }
 
     public string? OwnerLogin { get { lock (_lock) return _remote.OwnerLogin; } }
+
+    /// <summary>
+    /// Passkeys only work for the name they were made for, and the phone app's address changes with it. When this PC's
+    /// tailnet name changed, paired phones are dropped (they must pair again). True when that happened.
+    /// </summary>
+    public bool UseHost(string host)
+    {
+        lock (_lock)
+        {
+            if (string.Equals(_remote.HostName, host, StringComparison.OrdinalIgnoreCase)) return false;
+            var dropped = _remote.HostName != null && _devices.Count > 0;
+            if (_remote.HostName != null) _devices.Clear();
+            _remote.HostName = host;
+            Save();
+            return dropped;
+        }
+    }
 
     public IReadOnlyList<Device> Devices { get { lock (_lock) return _devices.ToList(); } }
 

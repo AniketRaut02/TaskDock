@@ -156,7 +156,8 @@ sealed class RemoteWindow : Window
         _enabled.IsEnabled = server != null || s?.Ready == true;
         Step(4, server != null, server != null ? $"On at {_remote.Address}" : _problem ?? "Remote is off", _enabled);
         _pair.IsEnabled = server != null;
-        Step(5, paired.Count > 0, paired.Count > 0 ? $"{paired.Count} phone{(paired.Count == 1 ? "" : "s")} paired" : "Pair your phone", _pair);
+        Step(5, paired.Count > 0, paired.Count > 0 ? $"{paired.Count} phone{(paired.Count == 1 ? "" : "s")} paired"
+            : server?.HostChanged == true ? App.HostChangedText : "Pair your phone", _pair);
         if (server == null) _qr.Visibility = Visibility.Collapsed;
 
         _devices.Children.Clear();

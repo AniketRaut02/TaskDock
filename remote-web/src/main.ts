@@ -1,4 +1,6 @@
 import { act, describe, peek } from './actions.ts';
+import { newAlerts } from './banner.ts';
+import type { Snapshot } from './delta.ts';
 import { h, replace } from './h.ts';
 import { clearPairing, loadPairing } from './idb.ts';
 import { Live } from './live.ts';
@@ -83,8 +85,14 @@ async function boot(): Promise<void> {
   }
 
   let approvalIds = '';
+  let seen: Snapshot | undefined;
   const live = new Live(token, s => {
     draw();
+    if (s.status === 'live' && s.snapshot && s.snapshot !== seen) {
+      const alerts = newAlerts(seen, s.snapshot);
+      seen = s.snapshot;
+      if (alerts.length) { toast(alerts.join('\n')); navigator.vibrate?.([30, 60, 30]); }
+    } else if (s.status !== 'live') seen = undefined; // after a reconnect, the first snapshot is a fresh start
     const ids = s.snapshot?.approvals.map(a => a.id) ?? [];
     if (s.status === 'live' && ids.join() !== approvalIds) { approvalIds = ids.join(); void closeHandled(new Set(ids)).catch(() => undefined); }
   });

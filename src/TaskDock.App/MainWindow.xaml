@@ -85,7 +85,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="b" Background="Transparent" CornerRadius="6" Padding="5">
+                        <Border x:Name="b" Background="Transparent" CornerRadius="6" Padding="4">
                             <Viewbox Width="{TemplateBinding FontSize}" Height="{TemplateBinding FontSize}">
                                 <Grid Width="24" Height="24">
                                     <Path Style="{StaticResource Stroke}" Data="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" Stroke="{TemplateBinding Foreground}"/>
@@ -109,7 +109,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
-                        <Border x:Name="b" Background="Transparent" CornerRadius="6" Padding="5">
+                        <Border x:Name="b" Background="Transparent" CornerRadius="6" Padding="4">
                             <Viewbox Width="14" Height="14">
                                 <Grid Width="24" Height="24">
                                     <Path x:Name="p" Style="{StaticResource Stroke}" Data="{StaticResource I.bellOff}" Stroke="{StaticResource Faint}"/>
@@ -129,10 +129,10 @@
         </Style>
         <!-- The source's own program icon, or our glyph for it while that isn't known. -->
         <Style x:Key="GlyphBox" TargetType="Border">
-            <Setter Property="Width" Value="26"/><Setter Property="Height" Value="26"/>
+            <Setter Property="Width" Value="24"/><Setter Property="Height" Value="24"/>
             <Setter Property="CornerRadius" Value="7"/>
             <Setter Property="Background" Value="{StaticResource Raised}"/>
-            <Setter Property="Margin" Value="0,0,9,0"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <Style x:Key="MenuIcon" TargetType="Viewbox">
@@ -173,9 +173,9 @@
                                 <Button Style="{StaticResource Icon}" Tag="{StaticResource I.close}" ToolTip="Remove" Command="{Binding UnpinCommand}"
                                         Visibility="{Binding IsPinned, Converter={StaticResource Vis}}"/>
                             </StackPanel>
-                            <Border DockPanel.Dock="Right" CornerRadius="9" Padding="7,2" Margin="6,0,2,0" VerticalAlignment="Center" Background="#202227">
+                            <Border DockPanel.Dock="Right" CornerRadius="9" Padding="6,1" Margin="4,0,1,0" VerticalAlignment="Center" Background="#202227">
                                 <StackPanel Orientation="Horizontal">
-                                    <Ellipse Width="6" Height="6" Fill="{Binding ClassBrush}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                    <Ellipse Width="6" Height="6" Fill="{Binding ClassBrush}" Margin="0,0,4,0" VerticalAlignment="Center"/>
                                     <TextBlock Text="{Binding StateText}" Foreground="{Binding ClassBrush}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Border>
@@ -189,13 +189,13 @@
                             </Border>
                             <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                         </DockPanel>
-                        <StackPanel Margin="35,0,0,0" Visibility="{Binding DataContext.IsExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Vis}}">
+                        <StackPanel Margin="32,0,0,0" Visibility="{Binding DataContext.IsExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Vis}}">
                             <TextBlock Text="{Binding Detail}" Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"
                                        Visibility="{Binding HasDetail, Converter={StaticResource Vis}}" ToolTip="{Binding Detail}"/>
                             <ProgressBar Height="3" Margin="0,6,0,0" Minimum="0" Maximum="1" Value="{Binding Progress}" Foreground="{Binding ClassBrush}"
                                          Background="{StaticResource Raised}" BorderThickness="0" Visibility="{Binding HasProgress, Converter={StaticResource Vis}}"/>
                         </StackPanel>
-                        <StackPanel Margin="35,0,0,0">
+                        <StackPanel Margin="32,0,0,0">
                             <Button Style="{StaticResource Btn}" Tag="{StaticResource I.power}" Content="Launch" HorizontalAlignment="Left" Margin="0,7,0,0" Command="{Binding LaunchCommand}"
                                     Visibility="{Binding CanLaunch, Converter={StaticResource Vis}}"/>
                             <!-- Downloads: expandable file list -->
@@ -279,7 +279,7 @@
             </Border>
 
             <!-- Expanded / compact -->
-            <StackPanel Width="320" Visibility="{Binding IsPill, Converter={StaticResource InvVis}}" Margin="8">
+            <StackPanel Width="352" Visibility="{Binding IsPill, Converter={StaticResource InvVis}}" Margin="8">
                 <DockPanel Margin="4,0,0,7" Background="Transparent" MouseLeftButtonDown="Header_MouseDown" Cursor="SizeAll">
                     <Button DockPanel.Dock="Right" Style="{StaticResource Icon}" Tag="{StaticResource I.layout}" ToolTip="Cycle mode (Ctrl+Alt+Shift+D)" Command="{Binding CycleModeCommand}"/>
                     <Border DockPanel.Dock="Right" Background="Transparent" Padding="5" CornerRadius="6" Margin="1,0,0,0" Cursor="Cross"

@@ -12,6 +12,8 @@ export interface Ui {
   activity?: ActivityEntry[];
   loadOlderActivity(): void;
   unpair(): void;
+  readonly alerts: 'on' | 'off' | 'blocked' | 'unsupported';
+  enableAlerts(): void;
 }
 
 export interface ActivityEntry { ts: string; deviceName: string; type: string; target: string; ok: boolean; code?: string; preview?: string }
@@ -179,6 +181,9 @@ function menu(s: Snapshot, live: LiveState, ui: Ui): HTMLElement {
     ]),
     section('This phone', [
       h('p', {}, live.deviceName ?? 'This phone'),
+      ui.alerts === 'on' ? h('p', { class: 'muted' }, 'Alerts are on: approvals and failures reach this phone when you’re away from the PC.')
+        : ui.alerts === 'unsupported' ? h('p', { class: 'muted' }, 'This browser can’t show alerts.')
+          : h('button', { class: 'primary', type: 'button', onclick: ui.enableAlerts }, 'Turn on alerts'),
       h('button', { type: 'button', onclick: () => ui.go('activity') }, 'Activity'),
       h('button', { class: 'danger', type: 'button', onclick: () => { if (confirm('Unpair this phone? You can pair it again from the PC.')) ui.unpair(); } }, 'Unpair'),
     ]));

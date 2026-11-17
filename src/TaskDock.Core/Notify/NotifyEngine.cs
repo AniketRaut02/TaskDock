@@ -82,6 +82,8 @@ public sealed class NotifyEngine(TimeProvider time)
         return sound;
     }
 
+    public bool QuietNow => InQuietHours(time.GetLocalNow());
+
     bool InQuietHours(DateTimeOffset local)
     {
         if (QuietFrom is not { } from || QuietTo is not { } to) return false;

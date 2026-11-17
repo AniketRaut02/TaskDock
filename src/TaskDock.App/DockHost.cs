@@ -16,7 +16,12 @@ sealed class DockHost : IDockOps, Remote.IDockHost
 {
     readonly MainViewModel _vm;
     readonly Dispatcher _ui;
-    readonly Func<TimeSpan> _holdWindow;
+    /// <summary>When each approval goes back to the terminal (Away mode decides); set by the App.</summary>
+    internal Func<PendingApproval, DateTimeOffset> DeadlineOf { get; set; } = p => p.Expires;
+    internal Func<FlagsView> Flags { get; set; } = () => new(Away: false, KeepAwake: false);
+    /// <summary>Raised once per new held approval, after the snapshot that first shows it (the push trigger).</summary>
+    internal event Action<ApprovalView>? ApprovalAdded;
+    HashSet<string> _seenApprovals = [];
     readonly Action<string, bool> _applyPreset;
     readonly string _epoch = Convert.ToHexStringLower(System.Security.Cryptography.RandomNumberGenerator.GetBytes(8));
     long _rev;
@@ -27,9 +32,9 @@ sealed class DockHost : IDockOps, Remote.IDockHost
     /// <summary>Raised on the UI thread with each new snapshot.</summary>
     public event Action<DockSnapshot>? Changed;
 
-    public DockHost(MainViewModel vm, Dispatcher ui, Func<TimeSpan> holdWindow, Action<string, bool> applyPreset)
+    public DockHost(MainViewModel vm, Dispatcher ui, Action<string, bool> applyPreset)
     {
-        (_vm, _ui, _holdWindow, _applyPreset) = (vm, ui, holdWindow, applyPreset);
+        (_vm, _ui, _applyPreset) = (vm, ui, applyPreset);
         vm.SnapshotChanged += Rebuild;
         if (vm.Media != null) vm.Media.Changed += Rebuild;
     }
@@ -39,9 +44,13 @@ sealed class DockHost : IDockOps, Remote.IDockHost
         static (Tile?, PresetTile?) Pair(TileViewModel v) => (v.Tile, v.PinTile);
         Snapshot = SnapshotBuilder.Build(_epoch, ++_rev, _vm.Tiles.Select(Pair), _vm.Detected.Select(Pair),
             _vm.Broker.Pending.Select(ToInput), _vm.Registry.Tiles.ToList(), _vm.Media?.ToView(),
-            new PresetsView(_vm.Preset.Name, PresetNames()), new FlagsView(Away: false, KeepAwake: false));
+            new PresetsView(_vm.Preset.Name, PresetNames()), Flags());
         Serilog.Log.Debug("Dock snapshot rev {Rev}", _rev);
         Changed?.Invoke(Snapshot);
+
+        var now = Snapshot.Approvals.Select(a => a.Id).ToHashSet();
+        foreach (var a in Snapshot.Approvals.Where(a => !_seenApprovals.Contains(a.Id))) ApprovalAdded?.Invoke(a);
+        _seenApprovals = now;
     }
 
     // shortcut: a preset saved from another TaskDock window shows up within 5 s; watch the folder if that's ever too slow.
@@ -52,7 +61,7 @@ sealed class DockHost : IDockOps, Remote.IDockHost
     }
 
     ApprovalInput ToInput(PendingApproval p) =>
-        new(p.Id, p.SessionId, p.ToolName, p.Preview, p.ToolInputJson, p.CanAlwaysAllow, p.Expires - _holdWindow(), p.Expires);
+        new(p.Id, p.SessionId, p.ToolName, p.Preview, p.ToolInputJson, p.CanAlwaysAllow, p.HeldAt, DeadlineOf(p));
 
     /// <summary>Re-checks and runs one action on the UI thread, where the widget's own buttons run.</summary>
     public Task<DockResult> RunAsync(DockAction action) => _ui.InvokeAsync(() => ActionRouter.RunAsync(action, this)).Task.Unwrap();

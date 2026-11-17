@@ -7,6 +7,7 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Fido2" Version="4.3.3" />
+    <PackageReference Include="Lib.Net.Http.WebPush" Version="3.3.1" />
     <ProjectReference Include="..\TaskDock.Core\TaskDock.Core.csproj" />
   </ItemGroup>
   <ItemGroup>

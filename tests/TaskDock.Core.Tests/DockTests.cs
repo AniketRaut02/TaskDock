@@ -128,3 +128,35 @@ public class DockTests
         Assert.Equal(new PillView("1 failed · 2 done", StatusClass.Error), Pill.Of([StatusClass.Done, StatusClass.Error, StatusClass.Done, StatusClass.Idle]));
     }
 }
+
+public class PresenceTests
+{
+    static readonly DateTimeOffset T0 = DateTimeOffset.Parse("2026-11-17T10:00:00Z");
+    static readonly TimeSpan AtPc = TimeSpan.FromSeconds(120);
+    static DateTimeOffset At(int s) => T0.AddSeconds(s);
+
+    [Theory]
+    [InlineData(false, -500, 120)] // at the PC all along: HoldSeconds after it was held
+    [InlineData(true, -500, 600)]  // away: the full hold
+    [InlineData(false, 300, 420)]  // came back at 5 min: a fresh 2 minutes from then
+    [InlineData(false, 550, 600)]  // came back at 9:10: never past the hub's own limit
+    [InlineData(false, 0, 120)]
+    public void Hold_deadline(bool away, int presentSinceS, int wantS) =>
+        Assert.Equal(At(wantS), HoldRule.Deadline(T0, At(600), away, At(presentSinceS), AtPc));
+
+    [Theory]
+    // kind, away, app open, quiet hours → urgency
+    [InlineData(PushKind.Approval, true, false, false, PushUrgency.High)]
+    [InlineData(PushKind.Approval, true, false, true, PushUrgency.High)]   // approvals get through quiet hours
+    [InlineData(PushKind.Approval, false, false, false, PushUrgency.None)] // at the PC: no push
+    [InlineData(PushKind.Approval, true, true, false, PushUrgency.None)]   // app open: shown live
+    [InlineData(PushKind.TileError, true, false, false, PushUrgency.Normal)]
+    [InlineData(PushKind.TileError, true, false, true, PushUrgency.None)]
+    [InlineData(PushKind.TileError, false, false, false, PushUrgency.None)]
+    [InlineData(PushKind.TileError, true, true, false, PushUrgency.None)]
+    [InlineData(PushKind.Sound, true, false, false, PushUrgency.Normal)]
+    [InlineData(PushKind.Sound, true, false, true, PushUrgency.None)]
+    [InlineData(PushKind.Sound, false, true, false, PushUrgency.None)]
+    public void Push_policy(PushKind kind, bool away, bool appOpen, bool quiet, PushUrgency want) =>
+        Assert.Equal(want, PushPolicy.Decide(kind, away, appOpen, quiet));
+}

@@ -159,15 +159,21 @@ public sealed class HubServer(HubOptions options, ChannelWriter<StateEvent> sink
         lock (_claude) e = _claude.Apply(p);
         if (e != null) sink.TryWrite(e);
 
-        if (e == null || p.GetProperty("hook_event_name").GetString() != "PermissionRequest") return Results.Ok();
+        // A turn that ended or moved on was answered in the terminal: Claude Code never closes the held request (spike S1),
+        // so drop the dead card now instead of at the end of the hold. Not on PreToolUse: a parallel call can arrive mid-hold.
+        var evt = p.GetProperty("hook_event_name").GetString();
+        if (evt is "Stop" or "StopFailure" or "UserPromptSubmit" or "SessionEnd" && e != null) broker.ResolveSession(e.Instance, ApprovalChoice.Terminal);
 
+        if (e == null || evt != "PermissionRequest") return Results.Ok();
+
+        var now = DateTimeOffset.UtcNow;
         var item = new PendingApproval(
             Guid.NewGuid().ToString("N"), e.Instance,
             p.TryGetProperty("tool_name", out var tn) ? tn.GetString() ?? "?" : "?",
             p.TryGetProperty("tool_input", out var ti) ? ClaudeSessions.ToolPreview(ti) : null,
             p.TryGetProperty("tool_input", out ti) ? JsonSerializer.Serialize(ti, new JsonSerializerOptions { WriteIndented = true }) : "{}",
             p.TryGetProperty("permission_suggestions", out var ps) ? ps : null,
-            DateTimeOffset.UtcNow + options.HoldWindow);
+            now + options.HoldWindow, now);
 
         var decision = await broker.Hold(item, options.HoldWindow, ctx.RequestAborted);
 

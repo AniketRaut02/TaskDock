@@ -60,6 +60,27 @@ public static partial class Win32
 
     public static void MoveTo(nint hwnd, int x, int y) => SetWindowPos(hwnd, 0, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 
+    [StructLayout(LayoutKind.Sequential)]
+    struct LASTINPUTINFO { public uint cbSize, dwTime; }
+
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static partial bool GetLastInputInfo(ref LASTINPUTINFO info);
+    [LibraryImport("kernel32.dll")] private static partial uint SetThreadExecutionState(uint flags);
+    const uint ES_CONTINUOUS = 0x80000000, ES_SYSTEM_REQUIRED = 0x1;
+
+    /// <summary>Time since the last keyboard or mouse input in this session.</summary>
+    public static TimeSpan IdleTime()
+    {
+        var info = new LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>() };
+        if (!GetLastInputInfo(ref info)) return TimeSpan.Zero;
+        return TimeSpan.FromMilliseconds(unchecked((uint)Environment.TickCount - info.dwTime)); // both wrap at 49.7 days
+    }
+
+    /// <summary>
+    /// Keeps the PC from sleeping on its idle timer (the display may still turn off; the lid and Sleep still work).
+    /// Per thread: call from the same thread each time (the UI thread).
+    /// </summary>
+    public static void KeepSystemAwake(bool on) => SetThreadExecutionState(on ? ES_CONTINUOUS | ES_SYSTEM_REQUIRED : ES_CONTINUOUS);
+
     /// <summary>A fullscreen D3D app, presentation mode or "busy" (e.g. a fullscreen video).</summary>
     public static bool SomethingIsFullscreen() =>
         SHQueryUserNotificationState(out var s) == 0 && s is 2 /*BUSY*/ or 3 /*D3D_FULL_SCREEN*/ or 4 /*PRESENTATION_MODE*/;

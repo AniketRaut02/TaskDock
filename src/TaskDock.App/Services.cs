@@ -88,6 +88,14 @@ static class ClaudeHooksInstaller
         if (Read() is { } s && ClaudeHooks.IsInstalled(s)) Write(ClaudeHooks.Uninstall(s));
     }
 
+    /// <summary>Rewrites installed hooks for a new hold (their timeout follows it). Writes only when something changes.</summary>
+    public static void SetHold(int port, string token, int holdSeconds)
+    {
+        if (Read() is not { } s || !ClaudeHooks.IsInstalled(s)) return;
+        var next = ClaudeHooks.Install(s.DeepClone().AsObject(), port, token, holdSeconds);
+        if (!JsonNode.DeepEquals(s, next)) Write(next);
+    }
+
     /// <summary>The port can fall back and the token can rotate; keep installed hooks pointing at the live hub.</summary>
     public static bool SyncIfInstalled(int port, string token, int holdSeconds)
     {

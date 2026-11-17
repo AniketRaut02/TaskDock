@@ -98,6 +98,36 @@ public sealed class HubTests : IAsyncLifetime
         Assert.Empty(_broker.Pending);
     }
 
+    [Theory]
+    [InlineData("stop", "Stop")]
+    [InlineData("prompt", "UserPromptSubmit")]
+    [InlineData("session-end", "SessionEnd")]
+    public async Task A_turn_that_moved_on_clears_its_held_approval(string route, string evt)
+    {
+        var call = _http.SendAsync(Hook("permission", Perm));
+        var p = await WaitForPending();
+        Assert.InRange(p.HeldAt, DateTimeOffset.UtcNow.AddSeconds(-5), DateTimeOffset.UtcNow);
+        // Answered in the terminal: Claude Code keeps the request open but carries on (spike S1).
+        await _http.SendAsync(Hook(route, $$"""{"session_id":"s1","cwd":"D:/p","hook_event_name":"{{evt}}"}"""));
+        var r = await call.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal("", await r.Content.ReadAsStringAsync());
+        Assert.Empty(_broker.Pending);
+    }
+
+    [Fact]
+    public async Task A_parallel_tool_call_does_not_clear_a_held_approval()
+    {
+        var call = _http.SendAsync(Hook("permission", Perm));
+        await WaitForPending();
+        await _http.SendAsync(Hook("pre-tool", """{"session_id":"s1","cwd":"D:/p","hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{}}"""));
+        await _http.SendAsync(Hook("stop", """{"session_id":"other","cwd":"D:/q","hook_event_name":"Stop"}""")); // another session
+        await Task.Delay(200);
+        Assert.Single(_broker.Pending);
+        Assert.False(call.IsCompleted);
+        _broker.Resolve(_broker.Pending[0].Id, ApprovalChoice.Terminal);
+        await call;
+    }
+
     [Fact]
     public async Task Hold_window_expiry_returns_no_decision()
     {

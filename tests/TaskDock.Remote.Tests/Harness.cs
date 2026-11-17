@@ -60,15 +60,15 @@ sealed class Harness : IAsyncDisposable
     public string Dir { get; } = Path.Combine(Path.GetTempPath(), "taskdock-remote-" + Guid.NewGuid().ToString("N"));
     public RemoteServer Server { get; }
 
-    public Harness(TimeSpan? confirmTimeout = null)
+    public Harness(TimeSpan? confirmTimeout = null, HttpMessageHandler? pushHandler = null)
     {
-        Server = new RemoteServer(new RemoteOptions { BasePort = 0, HostName = Name, Time = Time, DataDir = Dir, ConfirmTimeout = confirmTimeout ?? TimeSpan.FromMinutes(2) },
+        Server = new RemoteServer(new RemoteOptions { BasePort = 0, HostName = Name, Time = Time, DataDir = Dir, ConfirmTimeout = confirmTimeout ?? TimeSpan.FromMinutes(2), PushHandler = pushHandler },
             Host, new DeviceStore(Dir));
     }
 
-    public static async Task<Harness> Start(TimeSpan? confirmTimeout = null)
+    public static async Task<Harness> Start(TimeSpan? confirmTimeout = null, HttpMessageHandler? pushHandler = null)
     {
-        var h = new Harness(confirmTimeout);
+        var h = new Harness(confirmTimeout, pushHandler);
         h.Host.Publish(Snapshots.Base());
         await h.Server.StartAsync();
         return h;

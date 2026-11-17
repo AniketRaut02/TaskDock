@@ -7,7 +7,7 @@ public enum ApprovalChoice { Allow, AlwaysAllow, Deny, Terminal }
 
 public sealed record PendingApproval(
     string Id, string SessionId, string ToolName, string? Preview, string ToolInputJson,
-    JsonElement? Suggestions, DateTimeOffset Expires)
+    JsonElement? Suggestions, DateTimeOffset Expires, DateTimeOffset HeldAt)
 {
     public bool CanAlwaysAllow => Suggestions is { ValueKind: JsonValueKind.Array } s && s.GetArrayLength() > 0;
 }
@@ -29,6 +29,10 @@ public sealed class ApprovalBroker
 
     public bool Resolve(string id, ApprovalChoice choice, string? reason = null) =>
         _held.TryGetValue(id, out var h) && h.Tcs.TrySetResult((choice, reason));
+
+    /// <summary>Resolves every approval this session is holding; returns how many.</summary>
+    public int ResolveSession(string sessionId, ApprovalChoice choice) =>
+        _held.Values.Where(h => h.Item.SessionId == sessionId).Count(h => h.Tcs.TrySetResult((choice, null)));
 
     /// <summary>Returns null when the hold window expires or Claude Code drops the request.</summary>
     internal async Task<(ApprovalChoice Choice, string? Reason)?> Hold(PendingApproval item, TimeSpan window, CancellationToken aborted)

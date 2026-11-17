@@ -23,8 +23,12 @@ public sealed class Device
     public DateTimeOffset CreatedAt { get; init; }
     public DateTimeOffset LastSeenAt { get; set; }
     public StoredCredential? Credential { get; set; }
+    /// <summary>This phone's Web Push subscription, once it allowed notifications.</summary>
+    public PushTarget? Push { get; set; }
     [JsonIgnore] public bool IsActive => Status == "active";
 }
+
+public sealed record PushTarget(string Endpoint, string P256dh, string Auth);
 
 /// <summary>
 /// %LOCALAPPDATA%\TaskDock\remote\devices.json and remote.json, written atomically. Local, not roaming: devices belong
@@ -34,7 +38,12 @@ public sealed class DeviceStore
 {
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
 
-    sealed class RemoteFile { public string? OwnerLogin { get; set; } }
+    sealed class RemoteFile
+    {
+        public string? OwnerLogin { get; set; }
+        public string? VapidPublic { get; set; }  // base64url, uncompressed P-256 point
+        public string? VapidPrivate { get; set; } // base64url; same trust as hub.json's token (only this Windows user can read it)
+    }
 
     readonly string _dir;
     readonly Lock _lock = new();
@@ -84,6 +93,29 @@ public sealed class DeviceStore
             d.Status = "active";
             _remote.OwnerLogin ??= d.Login;
             Save();
+        }
+    }
+
+    /// <summary>This PC's VAPID key pair for Web Push, made the first time it's needed.</summary>
+    public (string Public, string Private) Vapid()
+    {
+        lock (_lock)
+        {
+            if (_remote is { VapidPublic: { } pub, VapidPrivate: { } priv }) return (pub, priv);
+            using var ec = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            var p = ec.ExportParameters(true);
+            (_remote.VapidPublic, _remote.VapidPrivate) = (Base64Url([0x04, .. p.Q.X!, .. p.Q.Y!]), Base64Url(p.D!));
+            Save();
+            return (_remote.VapidPublic, _remote.VapidPrivate);
+        }
+    }
+
+    public void SetPush(Device d, PushTarget? push)
+    {
+        lock (_lock)
+        {
+            d.Push = push;
+            if (d.IsActive) Save();
         }
     }
 

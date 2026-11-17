@@ -8,11 +8,13 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using H.NotifyIcon;
 using Serilog;
+using TaskDock.Core.Dock;
 using TaskDock.Core.Notify;
 using TaskDock.Core.Tiles;
 using Sound = TaskDock.Core.Tiles.Sound;
 using TaskDock.Hub;
 using TaskDock.Platform;
+using TaskDock.Remote;
 
 namespace TaskDock.App;
 
@@ -99,20 +101,25 @@ public partial class App : Application
             // Stay silent when you're already looking at the source (Claude sessions can't be mapped to a window).
             IsForeground = t => _settings.SilentWhenFocused && _vm.WindowOf(t) is var h && h != 0 && h == Platform.Desktop.Foreground(),
         };
+        // Pushes carry the tile's name and state only, never the detail line, a command or a path.
+        string Label(Tile t) => _vm!.PinOf(t)?.Label ?? t.Label;
+        void Push(PushKind kind, Tile t) => _remote?.Notify(new PushMessageFor(kind, Label(t), t.State, "tile-" + t.Key), notify.QuietNow);
         void Play(Sound s, Tile t)
         {
             if (s == Sound.None) return;
             Log.Information("Sound {Sound} for {Adapter}:{Instance}", s, t.Adapter, t.Instance);
             sounds.Play(s);
+            Push(PushKind.Sound, t);
         }
         registry.Transition += (t, prevClass, prevState) =>
         {
             Log.Information("Tile {Adapter}:{Instance} {Prev} -> {State}", t.Adapter, t.Instance, prevState, t.State); // state names only, no content
+            if (t.Class == StatusClass.Error && prevClass != StatusClass.Error) Push(PushKind.TileError, t);
             Play(notify.OnTransition(t, prevClass, prevState), t);
         };
 
         _vm.Media = new MediaViewModel(_settings, text => _vm.ShowHint(text), Dispatcher);
-        _dock = new DockHost(_vm, Dispatcher, () => _hubOptions.HoldWindow, ApplyPreset);
+        _dock = new DockHost(_vm, Dispatcher, ApplyPreset);
         _window = new MainWindow(_vm, _settings);
         _vm.Sync();
         _window.Show();
@@ -120,7 +127,12 @@ public partial class App : Application
         _vm.Hint += text => _tray.ShowNotification("TaskDock", text);
         await _vm.Media.StartAsync();
 
-        _remote = new RemoteControl(_dock);
+        _remote = new RemoteControl(_dock, ApplyHold);
+        var remote = _remote;
+        _dock.DeadlineOf = p => remote.Deadline(p, TimeSpan.FromSeconds(_settings.HoldSeconds));
+        _dock.Flags = () => new FlagsView(remote.Away, remote.KeepingAwake);
+        _dock.ApprovalAdded += a => remote.Notify(new PushMessageFor(PushKind.Approval, "Claude needs approval", $"{a.Tool} · {a.Project}",
+            "approval-" + a.Id, a.Id, DateTimeOffset.FromUnixTimeMilliseconds(a.Deadline)), notify.QuietNow);
         if (_settings.RemoteEnabled && await _remote.EnableAsync() is { } problem)
         {
             Log.Warning("Remote stayed off: {Problem}", problem);
@@ -148,6 +160,9 @@ public partial class App : Application
                 foreach (var ev in generic.Tick(_vm.Preset.Tiles)) { registry.Apply(ev); dirty = true; }
                 if (registry.Sweep().Count > 0) dirty = true;
                 UpdateVisibility();
+                var flags = (remote.Away, remote.KeepingAwake);
+                remote.Tick(broker, registry, TimeSpan.FromSeconds(_settings.HoldSeconds));
+                if (flags != (remote.Away, remote.KeepingAwake)) dirty = true; // the phone shows the Away badge and real deadlines
             }
             if (dirty)
             {
@@ -246,7 +261,7 @@ public partial class App : Application
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("Connect Claude Code", () =>
         {
-            ClaudeHooksInstaller.Connect(_hub!.Port, _hub.Token, _settings.HoldSeconds);
+            ClaudeHooksInstaller.Connect(_hub!.Port, _hub.Token, HubHoldSeconds);
             MessageBox.Show($"Hooks added to {Paths.ClaudeSettings}\n(backup: settings.json.taskdock.bak)\n\nNew Claude Code sessions will report to TaskDock.",
                 "TaskDock", MessageBoxButton.OK, MessageBoxImage.Information);
         }));
@@ -254,7 +269,7 @@ public partial class App : Application
         menu.Items.Add(Item("Rotate token", () =>
         {
             _hub!.RotateToken();
-            ClaudeHooksInstaller.SyncIfInstalled(_hub.Port, _hub.Token, _settings.HoldSeconds);
+            ClaudeHooksInstaller.SyncIfInstalled(_hub.Port, _hub.Token, HubHoldSeconds);
         }));
 
         var mute = new MenuItem { Header = "Mute sounds", IsCheckable = true, IsChecked = notify.Muted };
@@ -290,9 +305,7 @@ public partial class App : Application
         sounds.Volume = e.Volume;
         _vm!.AutoSort = e.AutoSort;
         _vm.Sync();
-        _hubOptions!.HoldWindow = TimeSpan.FromSeconds(e.HoldSeconds);
-        // Installed hooks carry a timeout derived from the hold window: rewrite them to match.
-        if (holdChanged && ClaudeHooksInstaller.IsInstalled()) ClaudeHooksInstaller.Connect(_hub!.Port, _hub.Token, e.HoldSeconds);
+        if (holdChanged) ApplyHold();
     }
 
     /// <summary>The tray icon shows how many detected sources are waiting to be pinned.</summary>
@@ -308,6 +321,19 @@ public partial class App : Application
             previous?.Dispose(); // ours to free too (Dispose is safe twice): at most one copy alive
         }
         _tray.ToolTipText = $"TaskDock · {_vm.PillText}";
+    }
+
+    /// <summary>
+    /// How long the hub holds an approval. With Remote on it's always the maximum, because Claude Code fixes the hook timeout
+    /// when a session starts; Away mode then decides the real wait (RemoteControl.Tick hands it back sooner at the PC).
+    /// </summary>
+    int HubHoldSeconds => _remote?.Server != null ? RemoteControl.RemoteHoldSeconds : _settings.HoldSeconds;
+
+    void ApplyHold()
+    {
+        _hubOptions!.HoldWindow = TimeSpan.FromSeconds(HubHoldSeconds);
+        try { ClaudeHooksInstaller.SetHold(_hub!.Port, _hub.Token, HubHoldSeconds); } // installed hooks' timeout follows the hold
+        catch (Exception ex) { Log.Warning(ex, "Could not update Claude Code hooks"); }
     }
 
     void OpenRemote()

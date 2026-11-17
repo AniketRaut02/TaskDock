@@ -37,6 +37,8 @@ public sealed class RemoteOptions
     public TimeProvider Time { get; init; } = TimeProvider.System;
     /// <summary>How long a phone waits for the PC's yes before its pairing is dropped.</summary>
     public TimeSpan ConfirmTimeout { get; init; } = TimeSpan.FromMinutes(2);
+    /// <summary>Tests: where Web Push requests go instead of the internet.</summary>
+    public HttpMessageHandler? PushHandler { get; init; }
 }
 
 /// <summary>
@@ -56,6 +58,7 @@ public sealed class RemoteServer(RemoteOptions options, IDockHost host, DeviceSt
     PairingCode? _code;
     WebApplication? _app;
     RemoteActions? _actions;
+    PushSender? _push;
 
     public ActivityLog Activity { get; } = new(options.DataDir, options.Time);
 
@@ -80,6 +83,7 @@ public sealed class RemoteServer(RemoteOptions options, IDockHost host, DeviceSt
             _app = app;
             Port = new Uri(app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First()).Port;
             host.Changed += OnSnapshot;
+            _push = new PushSender(devices, options.Time, app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("TaskDock.Remote"), options.PushHandler);
             return;
         }
         throw new IOException($"No free port in {options.BasePort}-{options.BasePort + options.PortSpan - 1}");
@@ -89,8 +93,37 @@ public sealed class RemoteServer(RemoteOptions options, IDockHost host, DeviceSt
     {
         host.Changed -= OnSnapshot;
         foreach (var s in _sessions.Keys) s.Abort();
+        if (_push != null) await _push.DisposeAsync();
         if (_app != null) await _app.DisposeAsync();
     }
+
+    /// <summary>
+    /// Sends m to each paired phone whose push policy says so: only while nobody is at the PC (away) and that phone's app
+    /// isn't open. Returns how many phones it was queued for.
+    /// </summary>
+    public int Notify(PushMessageFor m, bool away, bool quietHours)
+    {
+        if (_push == null) return 0;
+        var n = 0;
+        foreach (var d in devices.Devices.Where(d => d.IsActive && d.Push != null))
+        {
+            var appOpen = _sessions.Keys.Any(s => s.Device.Id == d.Id);
+            if (PushPolicy.Decide(m.Kind, away, appOpen, quietHours) is var u && u == PushUrgency.None) continue;
+            _push.Enqueue(d, m, u);
+            n++;
+        }
+        return n;
+    }
+
+    /// <summary>Whether this phone has the app open right now (a live socket).</summary>
+    public bool AnyPhoneOpen => !_sessions.IsEmpty;
+
+    // Web Push endpoints a phone may register. Anything else could make this PC POST to an address a token thief picked.
+    static readonly string[] PushHosts = ["fcm.googleapis.com", ".push.services.mozilla.com", ".notify.windows.com", "web.push.apple.com"];
+
+    static bool IsPushEndpoint(string? url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var u) && u.Scheme == "https" && u.IsDefaultPort
+        && PushHosts.Any(h => h.StartsWith('.') ? u.Host.EndsWith(h, StringComparison.OrdinalIgnoreCase) : u.Host.Equals(h, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>A new single-use pairing code, valid 5 minutes, 5 wrong attempts. Replaces any earlier one.</summary>
     public string NewPairingCode()
@@ -170,6 +203,19 @@ public sealed class RemoteServer(RemoteOptions options, IDockHost host, DeviceSt
             return o != null ? Results.Content(o, "application/json")
                 : Results.Json(new { code }, statusCode: code switch { "rate_limited" => 429, "already_resolved" => 409, _ => 400 });
         }));
+        app.MapGet("/api/push/vapid", (HttpContext ctx) =>
+            Bearer(ctx) is { IsActive: true } ? Results.Json(new { key = devices.Vapid().Public }) : Results.StatusCode(401));
+        app.MapPost("/api/push/subscribe", (Delegate)(async (HttpContext ctx) =>
+        {
+            if (Bearer(ctx) is not { IsActive: true } d) return Results.StatusCode(401);
+            var b = await ReadJson(ctx);
+            string? S(JsonNode? n) => n?.GetValueKind() == JsonValueKind.String ? n.GetValue<string>() : null;
+            var (endpoint, p256dh, auth) = (S(b?["endpoint"]), S(b?["keys"]?["p256dh"]), S(b?["keys"]?["auth"]));
+            if (!IsPushEndpoint(endpoint) || endpoint!.Length > 1024 || p256dh is not { Length: > 0 and <= 200 } || auth is not { Length: > 0 and <= 100 })
+                return Results.BadRequest(new { code = "invalid" });
+            devices.SetPush(d, new PushTarget(endpoint, p256dh, auth));
+            return Results.Ok(new { ok = true });
+        }));
         app.MapGet("/api/activity", (HttpContext ctx) =>
         {
             if (Bearer(ctx) is not { IsActive: true }) return Results.StatusCode(401);
@@ -194,7 +240,7 @@ public sealed class RemoteServer(RemoteOptions options, IDockHost host, DeviceSt
 
     IFido2 Fido() => new Fido2(new Fido2Configuration
     {
-        ServerDomain = options.HostName, ServerName = "TaskDock", Origins = new HashSet<string> { $"https://{options.PublicHost}" },
+        RPID = options.HostName, RPName = "TaskDock", Origins = new HashSet<string> { $"https://{options.PublicHost}" },
     });
 
     async Task<IResult> PairStart(HttpContext ctx)

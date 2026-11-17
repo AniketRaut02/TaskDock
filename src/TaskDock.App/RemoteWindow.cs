@@ -41,6 +41,8 @@ sealed class RemoteWindow : Window
                 _status, _enabled,
                 Hint("Turning this on shares TaskDock at this PC's Tailscale address. That name becomes public in certificate transparency logs, "
                     + "like every HTTPS certificate. Tailscale's free Personal plan is for non-commercial use."),
+                Hint("While it's on and you're away from the PC, Claude Code approvals wait up to 10 minutes for your phone. "
+                    + "Restart Claude Code sessions that are already running so they pick up the longer wait."),
                 _pair, _qr,
                 new TextBlock { Text = "Paired phones", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 16, 0, 6) },
                 _devices,

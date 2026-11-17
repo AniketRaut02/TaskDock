@@ -3,6 +3,7 @@ import { h, replace } from './h.ts';
 import { clearPairing, loadPairing } from './idb.ts';
 import { Live } from './live.ts';
 import { pairPage } from './pair.ts';
+import { alertsState, closeHandled, enableAlerts, subscribe } from './push.ts';
 import { render, toast, type ActivityEntry, type Ui } from './views.ts';
 
 interface InstallPrompt extends Event { prompt(): Promise<void> }
@@ -49,6 +50,8 @@ async function boot(): Promise<void> {
     get install() { return install ? () => { void install?.prompt(); install = undefined; draw(); } : undefined; },
     activity: undefined as ActivityEntry[] | undefined,
     loadOlderActivity() { void loadActivity(true); },
+    get alerts() { return alertsState(); },
+    async enableAlerts() { toast(await enableAlerts(token).catch((e: unknown) => e instanceof Error ? e.message : String(e))); draw(); },
     async unpair() {
       await fetch('/api/devices/self', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }).catch(() => undefined);
       await clearPairing();
@@ -65,7 +68,13 @@ async function boot(): Promise<void> {
     draw();
   }
 
-  const live = new Live(token, () => draw());
+  let approvalIds = '';
+  const live = new Live(token, s => {
+    draw();
+    const ids = s.snapshot?.approvals.map(a => a.id) ?? [];
+    if (s.status === 'live' && ids.join() !== approvalIds) { approvalIds = ids.join(); void closeHandled(new Set(ids)).catch(() => undefined); }
+  });
+  if (alertsState() === 'on') void subscribe(token).catch(() => undefined); // keep the PC's copy current
   addEventListener('hashchange', () => { if (route() === 'activity') void loadActivity(false); draw(); scrollTo(0, 0); });
   addEventListener('beforeinstallprompt', e => { e.preventDefault(); install = e as InstallPrompt; draw(); });
   setInterval(draw, 30_000); // approval countdowns and "Last seen" age

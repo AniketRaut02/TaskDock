@@ -87,6 +87,16 @@ public sealed class DeviceStore
         }
     }
 
+    public void SetSignCount(Device d, uint count)
+    {
+        lock (_lock)
+        {
+            if (d.Credential is not { } c || c.SignCount == count) return;
+            c.SignCount = count;
+            Save();
+        }
+    }
+
     public void Touch(Device d, DateTimeOffset now)
     {
         lock (_lock)

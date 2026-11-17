@@ -317,17 +317,19 @@ public class LiveTests
     }
 
     [Fact]
-    public async Task Actions_are_refused_while_the_phone_is_view_only()
+    public async Task An_action_on_the_socket_runs_and_answers_with_its_id()
     {
         await using var h = await Harness.Start();
         var (token, _, _) = await h.Pair();
         using var ws = await h.Socket();
         await Send(ws, Auth(token));
         await Next(ws); await Next(ws);
-        await Send(ws, new JsonObject { ["t"] = "action", ["id"] = "a1", ["body"] = new JsonObject { ["action"] = new JsonObject { ["type"] = "media.toggle" } } });
+        await Send(ws, new JsonObject { ["t"] = "action", ["body"] = new JsonObject { ["id"] = "a1", ["action"] = new JsonObject { ["type"] = "media.toggle" } } });
         var result = await Next(ws);
         Assert.Equal("result", result["t"]!.GetValue<string>());
-        Assert.Equal("forbidden", result["body"]!["code"]!.GetValue<string>());
+        Assert.Equal("a1", result["body"]!["id"]!.GetValue<string>());
+        Assert.True(result["body"]!["ok"]!.GetValue<bool>());
+        Assert.IsType<Core.Dock.MediaToggle>(Assert.Single(h.Host.Ran));
     }
 
     [Fact]

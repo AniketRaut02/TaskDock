@@ -10,6 +10,8 @@ export interface LiveState {
   deviceName?: string;
 }
 
+export interface Result { id: string; ok: boolean; code?: string; error?: string }
+
 interface Frame { t: string; id?: string; body?: unknown }
 
 /** The socket to the PC. Old state is never shown as live: status says whether it is current. */
@@ -19,6 +21,7 @@ export class Live {
   #backoff = 1000;
   #timer?: ReturnType<typeof setTimeout>;
   #stopped = false;
+  readonly #pending = new Map<string, (r: Result) => void>();
   readonly token: string;
   readonly onChange: (s: LiveState) => void;
 
@@ -28,8 +31,9 @@ export class Live {
     document.addEventListener('visibilitychange', () => {
       // Closed while hidden, so "app open" on the PC means someone is looking (push decisions use it in Phase 4).
       if (document.hidden) this.#close();
-      else { this.#backoff = 1000; this.connect(); }
+      else this.#now();
     });
+    addEventListener('online', () => this.#now()); // the network is back: don't sit out the backoff
   }
 
   connect(): void {
@@ -50,6 +54,21 @@ export class Live {
     };
   }
 
+  /** Sends one action and waits for its result. The same id is safe to resend: the PC answers it once. */
+  request(id: string, action: unknown, timeoutMs = 10_000): Promise<Result> {
+    return new Promise(resolve => {
+      const timer = setTimeout(() => { this.#pending.delete(id); resolve({ id, ok: false, code: 'timeout' }); }, timeoutMs);
+      this.#pending.set(id, r => { clearTimeout(timer); resolve(r); });
+      if (this.#ws?.readyState === WebSocket.OPEN) this.#ws.send(JSON.stringify({ t: 'action', body: { id, action } }));
+      else { this.#pending.delete(id); clearTimeout(timer); resolve({ id, ok: false, code: 'offline' }); }
+    });
+  }
+
+  #now(): void {
+    this.#backoff = 1000;
+    if (!this.#ws && !this.#stopped) this.connect();
+  }
+
   #frame(f: Frame): void {
     const now = Date.now();
     switch (f.t) {
@@ -64,14 +83,18 @@ export class Live {
         break;
       case 'delta': {
         const next = this.state.snapshot && applyDelta(this.state.snapshot, f.body as Delta);
-        if (!next) { this.#send({ t: 'resync', body: {} }); return; } // missed a frame or TaskDock restarted
+        if (!next) { this.#ws?.send(JSON.stringify({ t: 'resync', body: {} })); return; } // missed a frame or TaskDock restarted
         this.#set({ snapshot: next, lastSeen: now });
+        break;
+      }
+      case 'result': {
+        const r = f.body as Result;
+        this.#pending.get(r.id)?.(r);
+        this.#pending.delete(r.id);
         break;
       }
     }
   }
-
-  #send(f: Frame): void { this.#ws?.send(JSON.stringify(f)); }
 
   #close(): void {
     clearTimeout(this.#timer);

@@ -55,6 +55,9 @@ public sealed class RemoteServer(RemoteOptions options, IDockHost host, DeviceSt
     readonly Lock _codeLock = new();
     PairingCode? _code;
     WebApplication? _app;
+    RemoteActions? _actions;
+
+    public ActivityLog Activity { get; } = new(options.DataDir, options.Time);
 
     sealed class PairingCode(string value, DateTimeOffset expires)
     {
@@ -156,9 +159,29 @@ public sealed class RemoteServer(RemoteOptions options, IDockHost host, DeviceSt
         app.Map("/api/live", Live);
         app.MapDelete("/api/devices/self", (HttpContext ctx) =>
             Bearer(ctx) is { IsActive: true } d ? (Revoke(d.Id) ? Results.Ok() : Results.NotFound()) : Results.StatusCode(401));
+        // The service worker's Deny (Phase 4) and any client without a socket: same body and result as an action frame.
+        app.MapPost("/api/action", (Delegate)(async (HttpContext ctx) =>
+            Bearer(ctx) is { IsActive: true } d ? Json(await Actions.Handle(d, await ReadJson(ctx) as JsonObject)) : Results.StatusCode(401)));
+        app.MapPost("/api/stepup/options", (Delegate)(async (HttpContext ctx) =>
+        {
+            if (Bearer(ctx) is not { IsActive: true } d) return Results.StatusCode(401);
+            var (o, code) = Actions.StepUpOptions(d, await ReadJson(ctx) as JsonObject);
+            return o != null ? Results.Content(o, "application/json")
+                : Results.Json(new { code }, statusCode: code switch { "rate_limited" => 429, "already_resolved" => 409, _ => 400 });
+        }));
+        app.MapGet("/api/activity", (HttpContext ctx) =>
+        {
+            if (Bearer(ctx) is not { IsActive: true }) return Results.StatusCode(401);
+            DateTimeOffset? before = long.TryParse(ctx.Request.Query["before"], out var ms) ? DateTimeOffset.FromUnixTimeMilliseconds(ms) : null;
+            return Results.Json(Activity.Page(before), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        });
         app.MapFallback("{*path}", Static); // the default fallback pattern skips file-like paths (app.js, icons)
         return app;
     }
+
+    RemoteActions Actions => _actions ??= new RemoteActions(host, new StepUp(Fido, devices, options.Time), Activity, options.Time);
+
+    static IResult Json(JsonObject o) => Results.Content(o.ToJsonString(), "application/json");
 
     Device? Bearer(HttpContext ctx)
     {
@@ -269,7 +292,7 @@ public sealed class RemoteServer(RemoteOptions options, IDockHost host, DeviceSt
         }
         devices.Touch(device, options.Time.GetUtcNow());
 
-        var session = new LiveSession(ws, device, host);
+        var session = new LiveSession(ws, device, host, Actions);
         _sessions[session] = 0;
         try
         {

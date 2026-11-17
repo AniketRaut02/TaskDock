@@ -13,8 +13,9 @@ public sealed record PendingApproval(
 }
 
 /// <summary>
-/// Holds PermissionRequest calls open until the widget decides. Resolve is an in-process call only:
-/// no HTTP route can set a decision.
+/// Holds PermissionRequest calls open until the widget decides. Resolve is an in-process call: no hub route can set a
+/// decision. TaskDock Remote reaches it only through DockHost, after its own checks (tailnet identity, device token, and a
+/// fingerprint bound to the exact approval, input and choice); see the Security model in the Remote execution plan.
 /// </summary>
 public sealed class ApprovalBroker
 {

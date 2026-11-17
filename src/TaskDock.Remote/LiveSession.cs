@@ -6,7 +6,7 @@ using TaskDock.Core.Dock;
 namespace TaskDock.Remote;
 
 /// <summary>One phone's socket: a full snapshot on connect and on resync, then deltas at most every 250 ms.</summary>
-sealed class LiveSession(WebSocket ws, Device device, IDockHost host)
+sealed class LiveSession(WebSocket ws, Device device, IDockHost host, RemoteActions actions)
 {
     const int MaxClientFrame = 16 * 1024;
     static readonly TimeSpan MinGap = TimeSpan.FromMilliseconds(250); // at most 4 frames a second
@@ -37,8 +37,8 @@ sealed class LiveSession(WebSocket ws, Device device, IDockHost host)
                 switch (RemoteServer.Frame(text))
                 {
                     case { T: "resync" }: await SendSnapshot(); break;
-                    // Read-only until Phase 3 wires actions through ActionRouter.
-                    case { T: "action", Id: { } id }: await Send("result", new JsonObject { ["id"] = id, ["ok"] = false, ["code"] = "forbidden", ["error"] = "This TaskDock is view-only." }); break;
+                    // Not awaited: a slow action must not hold up resyncs. Results go back on this socket.
+                    case { T: "action", Body: { } body }: _ = Act(body); break;
                 }
             }
         }
@@ -48,6 +48,13 @@ sealed class LiveSession(WebSocket ws, Device device, IDockHost host)
             await pump;
             await Close(ws, WebSocketCloseStatus.NormalClosure, "bye");
         }
+    }
+
+    async Task Act(JsonObject body)
+    {
+        try { await Send("result", await actions.Handle(Device, body)); }
+        catch (WebSocketException) { } // the phone left; it resends the same ID and dedup answers
+        catch (ObjectDisposedException) { }
     }
 
     async Task Pump(CancellationToken ct)

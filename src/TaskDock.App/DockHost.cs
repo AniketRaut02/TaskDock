@@ -59,6 +59,8 @@ sealed class DockHost : IDockOps, Remote.IDockHost
 
     public Requirement Requirement(DockAction action) => ActionRouter.Requirement(action, this);
 
+    public void Notice(string text) => _ui.BeginInvoke(() => _vm.ShowHint(text));
+
     /// <summary>The device name comes from the phone: it is shown as plain text only.</summary>
     public Task<bool> ConfirmPairingAsync(string deviceName, CancellationToken ct) =>
         _ui.InvokeAsync(() => ConfirmDialog.AskAsync("TaskDock Remote", $"Allow \"{deviceName}\" to control TaskDock?\n\nOnly say yes if you just paired this phone yourself.",

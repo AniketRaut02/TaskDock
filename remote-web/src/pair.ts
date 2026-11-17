@@ -1,9 +1,7 @@
 import { h, replace } from './h.ts';
 import { savePairing } from './idb.ts';
 
-// WebAuthn options travel as JSON with base64url byte strings; the browser API wants ArrayBuffers.
-const fromB64 = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)).buffer;
-const toB64 = (b: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+import { fromB64, toB64 } from './b64.ts';
 
 interface CreationOptions {
   rp: { id?: string; name: string }; user: { id: string; name: string; displayName: string }; challenge: string;

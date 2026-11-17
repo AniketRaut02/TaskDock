@@ -28,6 +28,25 @@ sealed class FakeHost : IDockHost
         await Task.Delay(Timeout.Infinite, ct);
         return false;
     }
+
+    public List<ApprovalInput> Approvals { get; } =
+    [
+        new("bash1", "s1", "Bash", "npm test", """{"command":"npm test"}""", true, default, default),
+        new("bash2", "s1", "Bash", "rm -rf dist", """{"command":"rm -rf dist"}""", true, default, default),
+        new("grep1", "s1", "Grep", "TODO", """{"pattern":"TODO"}""", false, default, default),
+    ];
+    public List<DockAction> Ran { get; } = [];
+    public List<string> Notices { get; } = [];
+
+    public ApprovalInput? Approval(string id) => Approvals.FirstOrDefault(a => a.Id == id);
+    public Requirement Requirement(DockAction action) => action switch
+    {
+        ApprovalAlwaysAllow => Core.Dock.Requirement.Fingerprint,
+        ApprovalAllow a => Approval(a.ApprovalId) is { } p && Core.Claude.ToolRisk.Classify(p.ToolName) == Core.Claude.Risk.Read ? Core.Dock.Requirement.None : Core.Dock.Requirement.Fingerprint,
+        _ => Core.Dock.Requirement.None,
+    };
+    public Task<DockResult> RunAsync(DockAction action) { lock (Ran) Ran.Add(action); return Task.FromResult(DockResult.Success); }
+    public void Notice(string text) { lock (Notices) Notices.Add(text); }
 }
 
 /// <summary>A RemoteServer on a random loopback port, reached under the tailnet name like tailscale serve does.</summary>
@@ -83,8 +102,11 @@ sealed class Harness : IAsyncDisposable
     }
 
     /// <summary>Full pairing as a phone does it. Returns the device's token.</summary>
+    public SoftAuthenticator Phone { get; private set; } = new();
+
     public async Task<(string Token, string DeviceId, HttpResponseMessage Finish)> Pair(string name = "Pixel 8", string login = Owner)
     {
+        Phone = new SoftAuthenticator();
         var code = Server.NewPairingCode();
         using var c = Client(login);
         var start = await c.PostAsync("api/pair/start", Json(new JsonObject { ["code"] = code, ["deviceName"] = name }));
@@ -92,7 +114,7 @@ sealed class Harness : IAsyncDisposable
         var body = JsonNode.Parse(await start.Content.ReadAsStringAsync())!;
         var token = body["token"]!.GetValue<string>();
         using var c2 = Client(login, token);
-        var finish = await c2.PostAsync("api/pair/finish", Json(SoftAuthenticator.Create(body["creationOptions"]!, $"https://{Name}", Name)));
+        var finish = await c2.PostAsync("api/pair/finish", Json(Phone.Register(body["creationOptions"]!, $"https://{Name}", Name)));
         return (token, body["deviceId"]!.GetValue<string>(), finish);
     }
 
@@ -105,14 +127,44 @@ sealed class Harness : IAsyncDisposable
     }
 }
 
-/// <summary>A platform authenticator in software: P-256, "none" attestation, user verified.</summary>
-static class SoftAuthenticator
+/// <summary>A platform authenticator in software: P-256, "none" attestation, user verified. Keeps its key so it can sign.</summary>
+sealed class SoftAuthenticator
 {
-    public static JsonObject Create(JsonNode creationOptions, string origin, string rpId)
+    readonly ECDsa _key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+    readonly byte[] _credId = RandomNumberGenerator.GetBytes(16);
+    uint _count;
+
+    public static JsonObject Create(JsonNode creationOptions, string origin, string rpId) => new SoftAuthenticator().Register(creationOptions, origin, rpId);
+
+    /// <summary>A WebAuthn assertion over the server's options. counter: null keeps counting up (0 = never counts, like Google Password Manager).</summary>
+    public JsonObject Assert(JsonNode assertionOptions, string origin, string rpId, bool userVerified = true, uint? counter = null)
     {
-        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var count = counter ?? ++_count;
+        byte[] authData = [.. SHA256.HashData(Encoding.UTF8.GetBytes(rpId)), (byte)(userVerified ? 0x05 : 0x01),
+            (byte)(count >> 24), (byte)(count >> 16), (byte)(count >> 8), (byte)count];
+        var clientData = Encoding.UTF8.GetBytes(new JsonObject
+        {
+            ["type"] = "webauthn.get", ["challenge"] = assertionOptions["challenge"]!.GetValue<string>(), ["origin"] = origin, ["crossOrigin"] = false,
+        }.ToJsonString());
+        var sig = _key.SignData([.. authData, .. SHA256.HashData(clientData)], HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence);
+        var id = DeviceStore.Base64Url(_credId);
+        return new JsonObject
+        {
+            ["id"] = id, ["rawId"] = id, ["type"] = "public-key", ["clientExtensionResults"] = new JsonObject(),
+            ["response"] = new JsonObject
+            {
+                ["authenticatorData"] = DeviceStore.Base64Url(authData),
+                ["clientDataJSON"] = DeviceStore.Base64Url(clientData),
+                ["signature"] = DeviceStore.Base64Url(sig),
+            },
+        };
+    }
+
+    public JsonObject Register(JsonNode creationOptions, string origin, string rpId)
+    {
+        var key = _key;
         var p = key.ExportParameters(false);
-        var credId = RandomNumberGenerator.GetBytes(16);
+        var credId = _credId;
 
         var cose = new CborWriter(CborConformanceMode.Ctap2Canonical);
         cose.WriteStartMap(5);

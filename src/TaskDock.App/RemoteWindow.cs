@@ -22,6 +22,8 @@ sealed class RemoteWindow : Window
     bool _busy;
     string? _problem; // what to fix, kept until the next try
 
+    readonly TextBlock _activity = new() { FontFamily = new FontFamily("Cascadia Mono, Consolas"), FontSize = 11, TextWrapping = TextWrapping.Wrap };
+
     public RemoteWindow(RemoteControl remote, AppSettings settings)
     {
         (_remote, _settings) = (remote, settings);
@@ -42,6 +44,8 @@ sealed class RemoteWindow : Window
                 _pair, _qr,
                 new TextBlock { Text = "Paired phones", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 16, 0, 6) },
                 _devices,
+                new TextBlock { Text = "Recent activity from phones", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 16, 0, 6) },
+                _activity,
             },
         };
 
@@ -111,5 +115,9 @@ sealed class RemoteWindow : Window
             row.Children.Add(new TextBlock { Text = $"{d.Name}  ·  last seen {d.LastSeenAt.ToLocalTime():g}", VerticalAlignment = VerticalAlignment.Center });
             _devices.Children.Add(row);
         }
+
+        var recent = server?.Activity.Page(null, 12) ?? [];
+        _activity.Text = recent.Count == 0 ? "Nothing yet." : string.Join("\n", recent.Select(e =>
+            $"{e.Ts.ToLocalTime():HH:mm:ss}  {e.DeviceName}  {e.Type}  {e.Target}  {(e.Ok ? "ok" : e.Code)}"));
     }
 }

@@ -10,4 +10,12 @@ public interface IDockHost
     event Action<DockSnapshot>? Changed;
     /// <summary>"Allow Pixel 8 to control TaskDock?" on the PC. Only a yes activates a paired phone.</summary>
     Task<bool> ConfirmPairingAsync(string deviceName, CancellationToken ct);
+
+    /// <summary>A held approval as it is now, for binding a fingerprint to its exact input.</summary>
+    ApprovalInput? Approval(string id);
+    Requirement Requirement(DockAction action);
+    /// <summary>Re-checks the action against live state and runs it on the UI thread, as the widget's own buttons do.</summary>
+    Task<DockResult> RunAsync(DockAction action);
+    /// <summary>The widget's normal hint, so remote control is never invisible at the PC.</summary>
+    void Notice(string text);
 }

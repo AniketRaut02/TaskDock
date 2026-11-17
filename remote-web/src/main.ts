@@ -1,15 +1,14 @@
+import { act, describe } from './actions.ts';
 import { h, replace } from './h.ts';
-import { loadPairing } from './idb.ts';
+import { clearPairing, loadPairing } from './idb.ts';
 import { Live } from './live.ts';
 import { pairPage } from './pair.ts';
-import { render } from './views.ts';
+import { render, toast, type ActivityEntry, type Ui } from './views.ts';
 
 interface InstallPrompt extends Event { prompt(): Promise<void> }
 
 const root = document.getElementById('app')!;
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => { /* works without, just not offline */ });
-
-let install: InstallPrompt | undefined;
 
 async function boot(): Promise<void> {
   if (location.pathname === '/pair') { pairPage(root); return; }
@@ -18,14 +17,59 @@ async function boot(): Promise<void> {
   if (!pairing) {
     replace(root, h('main', { class: 'pair' },
       h('h1', {}, 'TaskDock'),
-      h('p', {}, 'This phone isn’t paired yet. On your PC, open TaskDock → Settings → Remote → Pair a phone, then scan the QR code.')));
+      h('p', {}, 'This phone isn’t paired yet. On your PC, open TaskDock → Phone (Remote) → Pair a phone, then scan the QR code.')));
     return;
   }
 
-  const live = new Live(pairing.token, s => draw());
-  const draw = () => render(root, live.state, install ? () => { void install?.prompt(); install = undefined; draw(); } : undefined);
+  const token = pairing.token;
+  let install: InstallPrompt | undefined;
+  let waiting = false;
+  const route = () => location.hash.slice(1);
+
+  // Redrawing replaces the DOM; while someone types (deny reason, search) wait, or their text and focus would vanish.
+  const draw = () => {
+    const el = document.activeElement;
+    if (el instanceof HTMLInputElement && root.contains(el)) { waiting = true; return; }
+    waiting = false;
+    render(root, live.state, route(), ui);
+  };
+  root.addEventListener('focusout', () => setTimeout(() => { if (waiting) draw(); }));
+
+  const ui: Ui = {
+    async run(button, action, approval) {
+      button.setAttribute('disabled', '');
+      button.setAttribute('aria-busy', 'true');
+      const r = await act(live, action, approval);
+      button.removeAttribute('disabled');
+      button.removeAttribute('aria-busy');
+      if (!r.ok) toast(describe(r));
+      return r.ok;
+    },
+    go(r) { location.hash = r; },
+    get install() { return install ? () => { void install?.prompt(); install = undefined; draw(); } : undefined; },
+    activity: undefined as ActivityEntry[] | undefined,
+    loadOlderActivity() { void loadActivity(true); },
+    async unpair() {
+      await fetch('/api/devices/self', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }).catch(() => undefined);
+      await clearPairing();
+      location.replace('/');
+    },
+  };
+
+  async function loadActivity(older: boolean): Promise<void> {
+    const last = ui.activity?.at(-1);
+    const before = older && last ? `?before=${Date.parse(last.ts)}` : '';
+    const res = await fetch(`/api/activity${before}`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => undefined);
+    const page = res?.ok ? await res.json() as ActivityEntry[] : [];
+    ui.activity = older ? [...(ui.activity ?? []), ...page] : page;
+    draw();
+  }
+
+  const live = new Live(token, () => draw());
+  addEventListener('hashchange', () => { if (route() === 'activity') void loadActivity(false); draw(); scrollTo(0, 0); });
   addEventListener('beforeinstallprompt', e => { e.preventDefault(); install = e as InstallPrompt; draw(); });
   setInterval(draw, 30_000); // approval countdowns and "Last seen" age
+  if (route() === 'activity') void loadActivity(false);
   live.connect();
 }
 

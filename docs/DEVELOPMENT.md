@@ -141,6 +141,10 @@ The hub follows the hooks docs: an empty 200 means no decision, an HTTP failure 
   - Seen: after the restart the phone took about 2 minutes to reconnect (backoff at 30 s, or the app was in the background). Phase 3: reconnect on the browser's `online` event and when TaskDock's port answers again.
   - Not checked: whether `tailscale serve` survives a reboot (Remote re-points it at startup either way).
 
+- **Phase 3, 17 Nov 2026: pass**, same phone. Every catalog action run from the phone and confirmed in the activity log on the PC and on the phone: approvals (Allow and Always allow with fingerprint, one-tap Grep, Deny with a reason, Terminal, answered on the PC first, Edit diff shown), Play, Pause, Resume and Stop on a real Unity Editor (UnityMCPTest), download pause and cancel, pin, unpin, rename, sounds, Clear, Launch (relaunched Unity from the phone), preset apply, merge and launch missing, media play/pause, pin and search. Media previous/next and player switching weren't available (Brave's YouTube offers neither; one player open). Holds reached Claude Code's hook format: allow, allow + rules, deny + message, no decision for Terminal.
+  - Found and fixed during the gate: the preset list never loaded (an overflow in the 5 s cache check, from Phase 1); a double tap could send two requests when a redraw replaced the button (identical taps within 1.5 s now share one); a half-open socket swallowed taps silently (server `KeepAliveTimeout` 30 s, and the app reconnects when a tap gets no answer in 10 s).
+  - Not done by hand: Play on a tile that is already Playing → `stale` (the phone redraws within 250 ms, so the race can't be hit by tapping); covered by ActionRouterTests and the server path.
+
 Run the remote tests with `dotnet test` (TaskDock.Remote.Tests) and `npm test` in `remote-web`. `npm run build` there writes `remote-web/dist`, which TaskDock.Remote embeds; without it the server serves a page saying the app wasn't built.
 
 ## Soak

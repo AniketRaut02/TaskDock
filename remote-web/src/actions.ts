@@ -23,7 +23,20 @@ export const describe = (r: Result): string => r.code === 'failed' ? r.error ?? 
  * Runs one action. No optimistic changes: the next delta shows what really happened. A short buzz on success,
  * three on failure. Allow on a risky tool and Always allow ask for the fingerprint first, bound to this exact request.
  */
-export async function act(live: Live, action: Action, approval?: ApprovalView): Promise<Result> {
+const inFlight = new Map<string, Promise<Result>>();
+
+/** The same tap twice within 1.5 s shares one request: a redraw between taps would otherwise send it twice. */
+export function act(live: Live, action: Action, approval?: ApprovalView): Promise<Result> {
+  const key = JSON.stringify(action);
+  const same = inFlight.get(key);
+  if (same) return same;
+  const p = send(live, action, approval);
+  inFlight.set(key, p);
+  void p.then(() => setTimeout(() => inFlight.delete(key), 1500));
+  return p;
+}
+
+async function send(live: Live, action: Action, approval?: ApprovalView): Promise<Result> {
   const id = crypto.randomUUID();
   const choice = action.type === 'approval.alwaysAllow' ? 'alwaysAllow' : action.type === 'approval.allow' ? 'allow' : null;
   let r: Result;

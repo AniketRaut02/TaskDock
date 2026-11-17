@@ -21,7 +21,7 @@ sealed class DockHost : IDockOps, Remote.IDockHost
     readonly string _epoch = Convert.ToHexStringLower(System.Security.Cryptography.RandomNumberGenerator.GetBytes(8));
     long _rev;
     List<string> _presetNames = [];
-    long _presetNamesAt = long.MinValue;
+    long? _presetNamesAt; // null until first read (long.MinValue overflowed the age check, so names never loaded)
 
     public DockSnapshot? Snapshot { get; private set; }
     /// <summary>Raised on the UI thread with each new snapshot.</summary>
@@ -47,7 +47,7 @@ sealed class DockHost : IDockOps, Remote.IDockHost
     // shortcut: a preset saved from another TaskDock window shows up within 5 s; watch the folder if that's ever too slow.
     List<string> PresetNames()
     {
-        if (Environment.TickCount64 - _presetNamesAt > 5000) (_presetNames, _presetNamesAt) = (PresetStore.Names().ToList(), Environment.TickCount64);
+        if (_presetNamesAt is not { } at || Environment.TickCount64 - at > 5000) (_presetNames, _presetNamesAt) = (PresetStore.Names().ToList(), Environment.TickCount64);
         return _presetNames;
     }
 

@@ -150,7 +150,8 @@ public sealed class RemoteServer(RemoteOptions options, IDockHost host, DeviceSt
             if (origin.Length > 0 && !string.Equals(origin, $"https://{options.PublicHost}", StringComparison.OrdinalIgnoreCase)) { ctx.Response.StatusCode = 403; return; }
             await next();
         });
-        app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(20) });
+        // KeepAliveTimeout: a phone that stops answering pings (lost network, Doze) is dropped instead of lingering half-open.
+        app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(20), KeepAliveTimeout = TimeSpan.FromSeconds(30) });
 
         // 5. Every /api route except pairing start and the socket (which authenticates with its first frame) needs a token.
         // (Delegate): as a bare method group these bind as RequestDelegate and their IResult is silently dropped.

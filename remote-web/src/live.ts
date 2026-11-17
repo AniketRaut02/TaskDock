@@ -57,7 +57,16 @@ export class Live {
   /** Sends one action and waits for its result. The same id is safe to resend: the PC answers it once. */
   request(id: string, action: unknown, timeoutMs = 10_000): Promise<Result> {
     return new Promise(resolve => {
-      const timer = setTimeout(() => { this.#pending.delete(id); resolve({ id, ok: false, code: 'timeout' }); }, timeoutMs);
+      const timer = setTimeout(() => {
+        this.#pending.delete(id);
+        // No answer: the socket is probably half-open (it looks open but nothing gets through). Drop it and reconnect now.
+        const ws = this.#ws;
+        this.#ws = undefined;
+        ws?.close();
+        this.#set({ status: 'offline' });
+        this.#now();
+        resolve({ id, ok: false, code: 'timeout' });
+      }, timeoutMs);
       this.#pending.set(id, r => { clearTimeout(timer); resolve(r); });
       if (this.#ws?.readyState === WebSocket.OPEN) this.#ws.send(JSON.stringify({ t: 'action', body: { id, action } }));
       else { this.#pending.delete(id); clearTimeout(timer); resolve({ id, ok: false, code: 'offline' }); }

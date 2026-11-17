@@ -58,11 +58,11 @@ static class AppIcons
         var name => ForProcess(name),
     };
 
-    /// <summary>Segoe Fluent glyph shown until (or instead of) a real icon.</summary>
+    /// <summary>Icon (Icons.xaml name) shown until, or instead of, the program's own icon. The phone uses the same three.</summary>
     public static string GlyphFor(string adapter) => adapter switch
     {
-        "claude" => "",    // command prompt
-        "downloads" => "", // download
-        _ => "",           // all apps
+        "claude" => "terminal",
+        "downloads" => "download",
+        _ => "window",
     };
 }

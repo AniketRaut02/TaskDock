@@ -4,7 +4,7 @@ using System.Windows.Data;
 
 namespace TaskDock.App;
 
-/// <summary>One converter for the small view conversions: visibility kinds plus two colour picks for the media bar.</summary>
+/// <summary>One converter for the small view conversions: visibility kinds, two colour picks for the media bar, and icon names.</summary>
 public sealed class VisConverter : IValueConverter
 {
     public string Kind { get; set; } = "";
@@ -18,6 +18,7 @@ public sealed class VisConverter : IValueConverter
         "Null" => value is null ? Visibility.Visible : Visibility.Collapsed,
         "PinColor" => value is true ? Amber : Grey,
         "ChipBg" => value is true ? Blue : Chip,
+        "Icon" => Application.Current.TryFindResource("I." + value), // an Icons.xaml geometry by name
         _ => throw new InvalidOperationException(Kind),
     };
 

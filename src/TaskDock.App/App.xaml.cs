@@ -223,9 +223,9 @@ public partial class App : Application
     TaskbarIcon BuildTray(NotifyEngine notify, Sounds sounds)
     {
         var menu = new ContextMenu();
-        MenuItem Item(string header, Action click)
+        MenuItem Item(string header, string? icon, Action click)
         {
-            var mi = new MenuItem { Header = header };
+            var mi = new MenuItem { Header = header, Icon = icon == null ? null : MenuIcon(icon) };
             mi.Click += (_, _) =>
             {
                 try { click(); }
@@ -237,50 +237,64 @@ public partial class App : Application
             };
             return mi;
         }
+        // A section label: a disabled item shows as a quiet heading in the native menu.
+        MenuItem Heading(string text) => new() { Header = text, IsEnabled = false, FontSize = 11, FontWeight = FontWeights.SemiBold };
 
-        menu.Items.Add(Item("Show / hide", () => { _userHidden = !_userHidden; UpdateVisibility(); }));
-        menu.Items.Add(Item("Cycle mode   Ctrl+Alt+Shift+D", () => _vm!.CycleMode()));
+        // ---- the widget ----
+        menu.Items.Add(Heading("Widget"));
+        menu.Items.Add(Item("Show or hide", "eye", () => { _userHidden = !_userHidden; UpdateVisibility(); }));
+        var cycle = Item("Next size", "layout", () => _vm!.CycleMode());
+        cycle.InputGestureText = "Ctrl+Alt+Shift+D";
+        menu.Items.Add(cycle);
 
-        var presets = new MenuItem { Header = "Presets" };
+        var presets = new MenuItem { Header = "Presets", Icon = MenuIcon("presets") };
         presets.SubmenuOpened += (_, _) =>
         {
             presets.Items.Clear();
             foreach (var name in PresetStore.Names().Order())
             {
-                var mi = Item(name, () => ApplyPreset(name, merge: Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)));
+                var mi = Item(name, null, () => ApplyPreset(name, merge: Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)));
                 mi.IsChecked = name == _vm!.Preset.Name;
                 mi.ToolTip = "Click to apply (replaces tiles). Shift+click to merge.";
                 presets.Items.Add(mi);
             }
             presets.Items.Add(new Separator());
-            presets.Items.Add(Item("Save current as…", SavePresetAs));
-            presets.Items.Add(Item("Launch missing", () => _ = _vm!.LaunchMissing()));
+            presets.Items.Add(Item("Save current as…", "pencil", SavePresetAs));
+            presets.Items.Add(Item("Launch missing", "power", () => _ = _vm!.LaunchMissing()));
         };
         presets.Items.Add(new MenuItem()); // placeholder so the submenu arrow shows
         menu.Items.Add(presets);
 
+        // ---- connections ----
         menu.Items.Add(new Separator());
-        menu.Items.Add(Item("Connect Claude Code", () =>
+        menu.Items.Add(Heading("Connect"));
+        menu.Items.Add(Item("Phone (Remote)…", "phone", OpenRemote));
+        var claude = new MenuItem { Header = "Claude Code", Icon = MenuIcon("terminal") };
+        claude.Items.Add(Item("Connect", "check", () =>
         {
             ClaudeHooksInstaller.Connect(_hub!.Port, _hub.Token, HubHoldSeconds);
             MessageBox.Show($"Hooks added to {Paths.ClaudeSettings}\n(backup: settings.json.taskdock.bak)\n\nNew Claude Code sessions will report to TaskDock.",
                 "TaskDock", MessageBoxButton.OK, MessageBoxImage.Information);
         }));
-        menu.Items.Add(Item("Disconnect Claude Code", ClaudeHooksInstaller.Disconnect));
-        menu.Items.Add(Item("Rotate token", () =>
+        claude.Items.Add(Item("Disconnect", "close", ClaudeHooksInstaller.Disconnect));
+        claude.Items.Add(new Separator());
+        claude.Items.Add(Item("Rotate token", "refresh", () =>
         {
             _hub!.RotateToken();
             ClaudeHooksInstaller.SyncIfInstalled(_hub.Port, _hub.Token, HubHoldSeconds);
         }));
+        menu.Items.Add(claude);
 
-        var mute = new MenuItem { Header = "Mute sounds", IsCheckable = true, IsChecked = notify.Muted };
-        mute.Click += (_, _) => { notify.Muted = _settings.Muted = mute.IsChecked; _settings.Save(); };
-        menu.Opened += (_, _) => mute.IsChecked = notify.Muted; // the settings window can change it too
-        menu.Items.Add(mute);
-        menu.Items.Add(Item("Phone (Remote)…", OpenRemote));
-        menu.Items.Add(Item("Settings…", () => OpenSettings(notify, sounds)));
+        // ---- TaskDock itself ----
         menu.Items.Add(new Separator());
-        menu.Items.Add(Item("Quit", Quit));
+        var mute = new MenuItem { Header = "Mute sounds", IsCheckable = true, IsChecked = notify.Muted };
+        void MuteIcon() => mute.Icon = MenuIcon(mute.IsChecked ? "mute" : "volume");
+        mute.Click += (_, _) => { notify.Muted = _settings.Muted = mute.IsChecked; _settings.Save(); MuteIcon(); };
+        menu.Opened += (_, _) => { mute.IsChecked = notify.Muted; MuteIcon(); }; // the settings window can change it too
+        menu.Items.Add(mute);
+        menu.Items.Add(Item("Settings…", "settings", () => OpenSettings(notify, sounds)));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(Item("Quit TaskDock", "quit", Quit));
 
         var tray = new TaskbarIcon { ToolTipText = "TaskDock", Icon = _shown = (System.Drawing.Icon)Badge(_badge = "T").Clone(), ContextMenu = menu };
         tray.TrayLeftMouseUp += (_, _) => { _userHidden = !_userHidden; UpdateVisibility(); };
@@ -338,6 +352,25 @@ public partial class App : Application
         try { ClaudeHooksInstaller.SetHold(_hub!.Port, _hub.Token, HubHoldSeconds); } // installed hooks' timeout follows the hold
         catch (Exception ex) { Log.Warning(ex, "Could not update Claude Code hooks"); }
     }
+
+    /// <summary>An Icons.xaml icon at menu size (the same icons as the widget and the phone).</summary>
+    static Viewbox MenuIcon(string name) => new()
+    {
+        Width = 14, Height = 14,
+        Child = new Grid
+        {
+            Width = 24, Height = 24,
+            Children =
+            {
+                new System.Windows.Shapes.Path
+                {
+                    Data = (Geometry)Current.FindResource("I." + name), Stroke = MenuInk, Style = (Style)Current.FindResource("Stroke"),
+                },
+            },
+        },
+    };
+
+    static readonly SolidColorBrush MenuInk = new(Color.FromRgb(0x5C, 0x5F, 0x69));
 
     void OpenRemote()
     {

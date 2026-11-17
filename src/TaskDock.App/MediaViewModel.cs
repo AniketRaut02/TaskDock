@@ -44,8 +44,6 @@ public sealed partial class MediaViewModel : ObservableObject
     [ObservableProperty] private bool _showChips;
     [ObservableProperty] private string _query = "";
 
-    public string PlayGlyph => Playing ? "" : ""; // Pause / Play in Segoe Fluent Icons
-    partial void OnPlayingChanged(bool value) => OnPropertyChanged(nameof(PlayGlyph));
     partial void OnCollapsedChanged(bool value) { _settings.MediaCollapsed = value; _settings.Save(); }
 
     internal MediaViewModel(AppSettings settings, Action<string> hint, Dispatcher ui)

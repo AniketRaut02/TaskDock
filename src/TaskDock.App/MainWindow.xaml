@@ -3,40 +3,63 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:TaskDock.App"
         Title="TaskDock" WindowStyle="None" ResizeMode="NoResize" Topmost="True" ShowInTaskbar="False"
-        SizeToContent="WidthAndHeight" Background="#1E1F24" ShowActivated="False"
+        SizeToContent="WidthAndHeight" Background="#121316" ShowActivated="False"
         FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="12" Foreground="#ECEDEE"
         UseLayoutRounding="True" TextOptions.TextFormattingMode="Display"
         AllowDrop="True" DragOver="Window_DragOver" Drop="Window_Drop">
+    <!-- Same palette, icons and card shape as the phone app (remote-web/src/app.css). -->
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="Vis"/>
-        <SolidColorBrush x:Key="Muted" Color="#9EA1AA"/>
-        <SolidColorBrush x:Key="TileBg" Color="#26282E"/>
+        <SolidColorBrush x:Key="Muted" Color="#8E909B"/>
+        <SolidColorBrush x:Key="Faint" Color="#5C5F69"/>
+        <SolidColorBrush x:Key="TileBg" Color="#1A1B1F"/>
+        <SolidColorBrush x:Key="Raised" Color="#24262B"/>
+        <SolidColorBrush x:Key="Line" Color="#2A2C33"/>
 
         <!-- Typing needs focus: drop NOACTIVATE while a text box is in use. -->
         <Style TargetType="TextBox">
             <EventSetter Event="PreviewMouseLeftButtonDown" Handler="TextInput_MouseDown"/>
             <EventSetter Event="LostKeyboardFocus" Handler="TextInput_LostFocus"/>
-            <Setter Property="Background" Value="#1A1B1F"/>
+            <Setter Property="Background" Value="#101114"/>
             <Setter Property="Foreground" Value="#ECEDEE"/>
-            <Setter Property="BorderBrush" Value="#3A3C44"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
             <Setter Property="CaretBrush" Value="#ECEDEE"/>
-            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="Padding" Value="6,3"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="7">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
+        <!-- Text button, with an optional icon: Tag="{StaticResource I.play}". -->
         <Style x:Key="Btn" TargetType="Button">
             <Setter Property="Foreground" Value="#ECEDEE"/>
-            <Setter Property="Background" Value="#33353C"/>
-            <Setter Property="Padding" Value="8,3"/>
-            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="Background" Value="{StaticResource Raised}"/>
+            <Setter Property="BorderBrush" Value="#30323A"/>
+            <Setter Property="Padding" Value="9,4"/>
+            <Setter Property="Margin" Value="0,0,5,0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Focusable" Value="False"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="b" Background="{TemplateBinding Background}" CornerRadius="5" Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border x:Name="b" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="7" Padding="{TemplateBinding Padding}">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Viewbox x:Name="ic" Width="12" Height="12" Margin="0,0,6,0" VerticalAlignment="Center">
+                                    <Grid Width="24" Height="24">
+                                        <Path Style="{StaticResource Stroke}" Data="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" Stroke="{TemplateBinding Foreground}"/>
+                                    </Grid>
+                                </Viewbox>
+                                <ContentPresenter VerticalAlignment="Center"/>
+                            </StackPanel>
                         </Border>
                         <ControlTemplate.Triggers>
+                            <Trigger Property="Tag" Value="{x:Null}"><Setter TargetName="ic" Property="Visibility" Value="Collapsed"/></Trigger>
                             <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="b" Property="Opacity" Value="0.85"/></Trigger>
                             <Trigger Property="IsEnabled" Value="False"><Setter TargetName="b" Property="Opacity" Value="0.3"/></Trigger>
                         </ControlTemplate.Triggers>
@@ -44,202 +67,290 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <Style x:Key="Icon" TargetType="Button" BasedOn="{StaticResource Btn}">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Padding" Value="4,1"/>
-            <Setter Property="Margin" Value="2,0,0,0"/>
-            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
-            <Setter Property="Foreground" Value="#9EA1AA"/>
-            <!-- Glyph buttons have no readable text: use the tooltip as the accessible name. -->
-            <Setter Property="AutomationProperties.Name" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
+        <Style x:Key="Primary" TargetType="Button" BasedOn="{StaticResource Btn}">
+            <Setter Property="Background" Value="#2F8A5C"/><Setter Property="BorderBrush" Value="#2F8A5C"/>
         </Style>
-        <Style x:Key="Bell" TargetType="ToggleButton">
-            <Setter Property="Focusable" Value="False"/>
+        <Style x:Key="Danger" TargetType="Button" BasedOn="{StaticResource Btn}">
+            <Setter Property="Background" Value="#8F3337"/><Setter Property="BorderBrush" Value="#8F3337"/>
+        </Style>
+
+        <!-- Icon-only button: Tag is the icon, FontSize its size, ToolTip its accessible name. -->
+        <Style x:Key="Icon" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Margin" Value="1,0,0,0"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="ToolTip" Value="Notify"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="AutomationProperties.Name" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="ToggleButton">
-                        <TextBlock x:Name="t" Text="&#xE7ED;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Foreground="#5C5F69" Padding="4,1" Background="Transparent"/>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="b" Background="Transparent" CornerRadius="6" Padding="5">
+                            <Viewbox Width="{TemplateBinding FontSize}" Height="{TemplateBinding FontSize}">
+                                <Grid Width="24" Height="24">
+                                    <Path Style="{StaticResource Stroke}" Data="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" Stroke="{TemplateBinding Foreground}"/>
+                                </Grid>
+                            </Viewbox>
+                        </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="t" Property="Text" Value="&#xEA8F;"/>
-                                <Setter TargetName="t" Property="Foreground" Value="#F5A524"/>
-                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="b" Property="Background" Value="{StaticResource Raised}"/></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="b" Property="Opacity" Value="0.3"/></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="Bell" TargetType="ToggleButton">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="ToolTip" Value="Notify"/>
+            <Setter Property="AutomationProperties.Name" Value="Notify"/>
+            <Setter Property="Margin" Value="1,0,0,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="b" Background="Transparent" CornerRadius="6" Padding="5">
+                            <Viewbox Width="14" Height="14">
+                                <Grid Width="24" Height="24">
+                                    <Path x:Name="p" Style="{StaticResource Stroke}" Data="{StaticResource I.bellOff}" Stroke="{StaticResource Faint}"/>
+                                </Grid>
+                            </Viewbox>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="p" Property="Data" Value="{StaticResource I.bell}"/>
+                                <Setter TargetName="p" Property="Stroke" Value="#F5A524"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="b" Property="Background" Value="{StaticResource Raised}"/></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- The source's own program icon, or our glyph for it while that isn't known. -->
+        <Style x:Key="GlyphBox" TargetType="Border">
+            <Setter Property="Width" Value="26"/><Setter Property="Height" Value="26"/>
+            <Setter Property="CornerRadius" Value="7"/>
+            <Setter Property="Background" Value="{StaticResource Raised}"/>
+            <Setter Property="Margin" Value="0,0,9,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="MenuIcon" TargetType="Viewbox">
+            <Setter Property="Width" Value="14"/><Setter Property="Height" Value="14"/>
+        </Style>
 
         <DataTemplate x:Key="TileTemplate" DataType="{x:Type local:TileViewModel}">
-            <Border Margin="0,0,0,6" CornerRadius="8" Background="{StaticResource TileBg}" MouseEnter="Tile_MouseEnter" MouseLeftButtonUp="Tile_MouseEnter">
+            <Border Margin="0,0,0,6" CornerRadius="10" Background="{StaticResource TileBg}" BorderBrush="#22242A" BorderThickness="1"
+                    MouseEnter="Tile_MouseEnter" MouseLeftButtonUp="Tile_MouseEnter">
                 <Border.ContextMenu>
                     <ContextMenu>
-                        <MenuItem Header="Rename…" Click="Tile_Rename" IsEnabled="{Binding IsPinned}"/>
-                        <MenuItem Header="Focus" Command="{Binding FocusCommand}" IsEnabled="{Binding CanFocus}"/>
-                        <MenuItem Header="Launch" Command="{Binding LaunchCommand}" IsEnabled="{Binding CanLaunch}"/>
-                        <MenuItem Header="Remove" Command="{Binding UnpinCommand}" IsEnabled="{Binding IsPinned}"/>
+                        <MenuItem Header="Rename…" Click="Tile_Rename" IsEnabled="{Binding IsPinned}">
+                            <MenuItem.Icon><Viewbox Style="{StaticResource MenuIcon}"><Grid Width="24" Height="24"><Path Style="{StaticResource Stroke}" Data="{StaticResource I.pencil}" Stroke="#5C5F69"/></Grid></Viewbox></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="Focus" Command="{Binding FocusCommand}" IsEnabled="{Binding CanFocus}">
+                            <MenuItem.Icon><Viewbox Style="{StaticResource MenuIcon}"><Grid Width="24" Height="24"><Path Style="{StaticResource Stroke}" Data="{StaticResource I.focus}" Stroke="#5C5F69"/></Grid></Viewbox></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="Launch" Command="{Binding LaunchCommand}" IsEnabled="{Binding CanLaunch}">
+                            <MenuItem.Icon><Viewbox Style="{StaticResource MenuIcon}"><Grid Width="24" Height="24"><Path Style="{StaticResource Stroke}" Data="{StaticResource I.power}" Stroke="#5C5F69"/></Grid></Viewbox></MenuItem.Icon>
+                        </MenuItem>
+                        <Separator/>
+                        <MenuItem Header="Remove" Command="{Binding UnpinCommand}" IsEnabled="{Binding IsPinned}">
+                            <MenuItem.Icon><Viewbox Style="{StaticResource MenuIcon}"><Grid Width="24" Height="24"><Path Style="{StaticResource Stroke}" Data="{StaticResource I.close}" Stroke="#5C5F69"/></Grid></Viewbox></MenuItem.Icon>
+                        </MenuItem>
                     </ContextMenu>
                 </Border.ContextMenu>
                 <Grid>
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="4"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                    <Border Background="{Binding ClassBrush}" CornerRadius="8,0,0,8"/>
-                    <StackPanel Grid.Column="1" Margin="10,7,8,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="3"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                    <Border Background="{Binding ClassBrush}" CornerRadius="0,3,3,0" Margin="0,10"/>
+                    <StackPanel Grid.Column="1" Margin="9,8,6,9">
                         <DockPanel>
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Style="{StaticResource Icon}" Content="&#xE8A7;" ToolTip="Focus window" Command="{Binding FocusCommand}"
+                                <Button Style="{StaticResource Icon}" Tag="{StaticResource I.focus}" ToolTip="Focus window" Command="{Binding FocusCommand}"
                                         Visibility="{Binding CanFocus, Converter={StaticResource Vis}}"/>
                                 <ToggleButton Style="{StaticResource Bell}" IsChecked="{Binding Notify}" Visibility="{Binding IsPinned, Converter={StaticResource Vis}}"/>
-                                <Button Style="{StaticResource Icon}" Content="&#xE718;" ToolTip="Pin" Command="{Binding PinCommand}"
+                                <Button Style="{StaticResource Icon}" Tag="{StaticResource I.pin}" ToolTip="Pin" Command="{Binding PinCommand}"
                                         Visibility="{Binding IsPinned, Converter={StaticResource InvVis}}"/>
-                                <Button Style="{StaticResource Icon}" Content="&#xE711;" ToolTip="Remove" Command="{Binding UnpinCommand}"
+                                <Button Style="{StaticResource Icon}" Tag="{StaticResource I.close}" ToolTip="Remove" Command="{Binding UnpinCommand}"
                                         Visibility="{Binding IsPinned, Converter={StaticResource Vis}}"/>
                             </StackPanel>
-                            <TextBlock Text="{Binding StateText}" DockPanel.Dock="Right" Foreground="{Binding ClassBrush}" Margin="8,0,4,0" VerticalAlignment="Center"/>
-<Grid DockPanel.Dock="Left" Width="16" Height="16" Margin="0,0,7,0" VerticalAlignment="Center">
-                                <Image Source="{Binding AppIcon}" RenderOptions.BitmapScalingMode="HighQuality"/>
-                                <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13" Foreground="{StaticResource Muted}"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding AppIcon, Converter={StaticResource NullVis}}"/>
-                            </Grid>
+                            <Border DockPanel.Dock="Right" CornerRadius="9" Padding="7,2" Margin="6,0,2,0" VerticalAlignment="Center" Background="#202227">
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse Width="6" Height="6" Fill="{Binding ClassBrush}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding StateText}" Foreground="{Binding ClassBrush}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+                            <Border DockPanel.Dock="Left" Style="{StaticResource GlyphBox}">
+                                <Grid>
+                                    <Image Source="{Binding AppIcon}" Width="16" Height="16" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                    <Viewbox Width="14" Height="14" Visibility="{Binding AppIcon, Converter={StaticResource NullVis}}">
+                                        <Grid Width="24" Height="24"><Path Style="{StaticResource Stroke}" Data="{Binding Glyph, Converter={StaticResource IconRes}}" Stroke="{StaticResource Muted}"/></Grid>
+                                    </Viewbox>
+                                </Grid>
+                            </Border>
                             <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                         </DockPanel>
-                        <StackPanel Visibility="{Binding DataContext.IsExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Vis}}">
-                            <TextBlock Text="{Binding Detail}" Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"
+                        <StackPanel Margin="35,0,0,0" Visibility="{Binding DataContext.IsExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Vis}}">
+                            <TextBlock Text="{Binding Detail}" Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"
                                        Visibility="{Binding HasDetail, Converter={StaticResource Vis}}" ToolTip="{Binding Detail}"/>
-                            <ProgressBar Height="3" Margin="0,5,0,0" Minimum="0" Maximum="1" Value="{Binding Progress}" Foreground="{Binding ClassBrush}"
-                                         Background="#33353C" BorderThickness="0" Visibility="{Binding HasProgress, Converter={StaticResource Vis}}"/>
+                            <ProgressBar Height="3" Margin="0,6,0,0" Minimum="0" Maximum="1" Value="{Binding Progress}" Foreground="{Binding ClassBrush}"
+                                         Background="{StaticResource Raised}" BorderThickness="0" Visibility="{Binding HasProgress, Converter={StaticResource Vis}}"/>
                         </StackPanel>
-                        <Button Style="{StaticResource Btn}" Content="Launch" HorizontalAlignment="Left" Margin="0,6,0,0" Command="{Binding LaunchCommand}"
-                                Visibility="{Binding CanLaunch, Converter={StaticResource Vis}}"/>
-                        <!-- Downloads: expandable file list -->
-                        <Button Style="{StaticResource Btn}" Content="{Binding ItemsToggleText}" HorizontalAlignment="Left" Margin="0,6,0,0" Padding="7,1"
-                                Command="{Binding ToggleItemsCommand}" Visibility="{Binding ItemsToggleText, Converter={StaticResource NotNull}}"/>
-                        <ItemsControl ItemsSource="{Binding Items}" Margin="0,4,0,0" Visibility="{Binding ShowItems, Converter={StaticResource Vis}}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="{x:Type local:DownloadItemViewModel}">
-                                    <StackPanel Margin="0,4,0,2">
-                                        <DockPanel>
-                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                                <Button Style="{StaticResource Icon}" Content="&#xE769;" ToolTip="Pause" Command="{Binding PauseCommand}" Visibility="{Binding CanPause, Converter={StaticResource Vis}}"/>
-                                                <Button Style="{StaticResource Icon}" Content="&#xE768;" ToolTip="Resume" Command="{Binding ResumeCommand}" Visibility="{Binding CanResume, Converter={StaticResource Vis}}"/>
-                                                <Button Style="{StaticResource Icon}" Content="&#xE711;" ToolTip="Cancel" Command="{Binding CancelCommand}" Visibility="{Binding CanCancel, Converter={StaticResource Vis}}"/>
-                                                <Button Style="{StaticResource Icon}" Content="&#xE8E5;" ToolTip="Open" Command="{Binding OpenCommand}" Visibility="{Binding CanOpen, Converter={StaticResource Vis}}"/>
-                                                <Button Style="{StaticResource Icon}" Content="&#xE838;" ToolTip="Show in folder" Command="{Binding ShowCommand}" Visibility="{Binding CanOpen, Converter={StaticResource Vis}}"/>
-                                            </StackPanel>
-                                            <TextBlock TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip="{Binding File}">
-                                                <Run Text="{Binding File, Mode=OneWay}"/><Run Text="  "/><Run Text="{Binding StateText, Mode=OneWay}" Foreground="{StaticResource Muted}"/>
-                                            </TextBlock>
-                                        </DockPanel>
-                                        <ProgressBar Height="2" Margin="0,3,0,0" Minimum="0" Maximum="1" Value="{Binding Progress, Mode=OneWay}" Foreground="#3E8EF7"
-                                                     Background="#33353C" BorderThickness="0" Visibility="{Binding HasProgress, Converter={StaticResource Vis}}"/>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <Button Style="{StaticResource Btn}" Content="▶ Play" HorizontalAlignment="Left" Margin="0,6,0,0" Command="{Binding PlayCommand}"
-                                Visibility="{Binding CanPlay, Converter={StaticResource Vis}}"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0" Visibility="{Binding CanStopPause, Converter={StaticResource Vis}}">
-                            <Button Style="{StaticResource Btn}" Content="■ Stop" Command="{Binding StopCommand}"/>
-                            <Button Style="{StaticResource Btn}" Content="{Binding PauseText}" Command="{Binding PauseCommand}"/>
-                        </StackPanel>
-
-                        <!-- Approval card: one per pending request, queued per tile. -->
-                        <Border Margin="0,8,0,0" Padding="8" CornerRadius="6" Background="#2F2A1F" BorderBrush="#5A4A22" BorderThickness="1"
-                                DataContext="{Binding Approval}" Visibility="{Binding DataContext.Approval, RelativeSource={RelativeSource AncestorType=StackPanel}, Converter={StaticResource NotNull}}">
-                            <StackPanel>
-                                <DockPanel>
-                                    <Button DockPanel.Dock="Right" Style="{StaticResource Icon}" Content="&#xE70D;" ToolTip="Show full input" Command="{Binding ToggleExpandedCommand}"/>
-                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="#F5A524"/>
-                                </DockPanel>
-                                <TextBox Text="{Binding Preview, Mode=OneWay}" IsReadOnly="True" FontFamily="Cascadia Mono, Consolas" FontSize="11"
-                                         TextWrapping="Wrap" MaxHeight="48" Margin="0,4,0,0" VerticalScrollBarVisibility="Auto"
-                                         Visibility="{Binding Expanded, Converter={StaticResource InvVis}}"/>
-                                <TextBox Text="{Binding FullInput, Mode=OneWay}" IsReadOnly="True" FontFamily="Cascadia Mono, Consolas" FontSize="11"
-                                         TextWrapping="Wrap" MaxHeight="220" Margin="0,4,0,0" VerticalScrollBarVisibility="Auto"
-                                         Visibility="{Binding Expanded, Converter={StaticResource Vis}}"/>
-                                <WrapPanel Margin="0,6,0,0">
-                                    <Button Style="{StaticResource Btn}" Content="Allow" Background="#2B6E4C" Command="{Binding AllowCommand}"/>
-                                    <Button Style="{StaticResource Btn}" Content="Always allow" Command="{Binding AlwaysAllowCommand}"
-                                            Visibility="{Binding CanAlwaysAllow, Converter={StaticResource Vis}}"/>
-                                    <Button Style="{StaticResource Btn}" Content="Deny" Background="#7A2E31" Command="{Binding DenyCommand}"/>
-                                    <Button Style="{StaticResource Btn}" Content="Terminal" ToolTip="Let the terminal prompt decide" Command="{Binding TerminalCommand}"/>
-                                </WrapPanel>
-                                <Grid Margin="0,6,0,0">
-                                    <TextBox Text="{Binding DenyReason, UpdateSourceTrigger=PropertyChanged}"/>
-                                    <TextBlock Text="Deny reason (optional)" Foreground="#5C5F69" Margin="6,2,0,0" IsHitTestVisible="False"
-                                               Visibility="{Binding DenyReason, Converter={StaticResource EmptyVis}}"/>
-                                </Grid>
+                        <StackPanel Margin="35,0,0,0">
+                            <Button Style="{StaticResource Btn}" Tag="{StaticResource I.power}" Content="Launch" HorizontalAlignment="Left" Margin="0,7,0,0" Command="{Binding LaunchCommand}"
+                                    Visibility="{Binding CanLaunch, Converter={StaticResource Vis}}"/>
+                            <!-- Downloads: expandable file list -->
+                            <Button Style="{StaticResource Btn}" Tag="{StaticResource I.download}" Content="{Binding ItemsToggleText}" HorizontalAlignment="Left" Margin="0,7,0,0" Padding="8,3"
+                                    Command="{Binding ToggleItemsCommand}" Visibility="{Binding ItemsToggleText, Converter={StaticResource NotNull}}"/>
+                            <ItemsControl ItemsSource="{Binding Items}" Margin="0,4,0,0" Visibility="{Binding ShowItems, Converter={StaticResource Vis}}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type local:DownloadItemViewModel}">
+                                        <StackPanel Margin="0,4,0,2">
+                                            <DockPanel>
+                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                                    <Button Style="{StaticResource Icon}" FontSize="12" Tag="{StaticResource I.pause}" ToolTip="Pause" Command="{Binding PauseCommand}" Visibility="{Binding CanPause, Converter={StaticResource Vis}}"/>
+                                                    <Button Style="{StaticResource Icon}" FontSize="12" Tag="{StaticResource I.play}" ToolTip="Resume" Command="{Binding ResumeCommand}" Visibility="{Binding CanResume, Converter={StaticResource Vis}}"/>
+                                                    <Button Style="{StaticResource Icon}" FontSize="12" Tag="{StaticResource I.close}" ToolTip="Cancel" Command="{Binding CancelCommand}" Visibility="{Binding CanCancel, Converter={StaticResource Vis}}"/>
+                                                    <Button Style="{StaticResource Icon}" FontSize="12" Tag="{StaticResource I.open}" ToolTip="Open" Command="{Binding OpenCommand}" Visibility="{Binding CanOpen, Converter={StaticResource Vis}}"/>
+                                                    <Button Style="{StaticResource Icon}" FontSize="12" Tag="{StaticResource I.folder}" ToolTip="Show in folder" Command="{Binding ShowCommand}" Visibility="{Binding CanOpen, Converter={StaticResource Vis}}"/>
+                                                </StackPanel>
+                                                <TextBlock TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip="{Binding File}">
+                                                    <Run Text="{Binding File, Mode=OneWay}"/><Run Text="  "/><Run Text="{Binding StateText, Mode=OneWay}" Foreground="{StaticResource Muted}"/>
+                                                </TextBlock>
+                                            </DockPanel>
+                                            <ProgressBar Height="2" Margin="0,3,0,0" Minimum="0" Maximum="1" Value="{Binding Progress, Mode=OneWay}" Foreground="#3E8EF7"
+                                                         Background="{StaticResource Raised}" BorderThickness="0" Visibility="{Binding HasProgress, Converter={StaticResource Vis}}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Button Style="{StaticResource Btn}" Tag="{StaticResource I.play}" Content="Play" HorizontalAlignment="Left" Margin="0,7,0,0" Command="{Binding PlayCommand}"
+                                    Visibility="{Binding CanPlay, Converter={StaticResource Vis}}"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,7,0,0" Visibility="{Binding CanStopPause, Converter={StaticResource Vis}}">
+                                <Button Style="{StaticResource Btn}" Tag="{StaticResource I.stop}" Content="Stop" Command="{Binding StopCommand}"/>
+                                <Button Style="{StaticResource Btn}" Tag="{StaticResource I.pause}" Content="{Binding PauseText}" Command="{Binding PauseCommand}"/>
                             </StackPanel>
-                        </Border>
-                        <TextBlock Text="{Binding MoreApprovals}" Foreground="#F5A524" Margin="0,4,0,0" FontSize="11"
-                                   Visibility="{Binding MoreApprovals, Converter={StaticResource NotNull}}"/>
+
+                            <!-- Approval card: one per pending request, queued per tile. -->
+                            <Border Margin="0,8,0,0" Padding="9" CornerRadius="9" Background="#221F18" BorderBrush="#4A3D1E" BorderThickness="1"
+                                    DataContext="{Binding Approval}" Visibility="{Binding DataContext.Approval, RelativeSource={RelativeSource AncestorType=StackPanel}, Converter={StaticResource NotNull}}">
+                                <StackPanel>
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Right" Style="{StaticResource Icon}" Tag="{StaticResource I.chevronDown}" ToolTip="Show full input" Command="{Binding ToggleExpandedCommand}"/>
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="#F5A524" VerticalAlignment="Center"/>
+                                    </DockPanel>
+                                    <TextBox Text="{Binding Preview, Mode=OneWay}" IsReadOnly="True" FontFamily="Cascadia Mono, Consolas" FontSize="11"
+                                             TextWrapping="Wrap" MaxHeight="48" Margin="0,5,0,0" VerticalScrollBarVisibility="Auto"
+                                             Visibility="{Binding Expanded, Converter={StaticResource InvVis}}"/>
+                                    <TextBox Text="{Binding FullInput, Mode=OneWay}" IsReadOnly="True" FontFamily="Cascadia Mono, Consolas" FontSize="11"
+                                             TextWrapping="Wrap" MaxHeight="220" Margin="0,5,0,0" VerticalScrollBarVisibility="Auto"
+                                             Visibility="{Binding Expanded, Converter={StaticResource Vis}}"/>
+                                    <WrapPanel Margin="0,7,0,0">
+                                        <Button Style="{StaticResource Primary}" Tag="{StaticResource I.check}" Content="Allow" Command="{Binding AllowCommand}" Margin="0,0,5,5"/>
+                                        <Button Style="{StaticResource Btn}" Content="Always allow" Command="{Binding AlwaysAllowCommand}" Margin="0,0,5,5"
+                                                Visibility="{Binding CanAlwaysAllow, Converter={StaticResource Vis}}"/>
+                                        <Button Style="{StaticResource Danger}" Tag="{StaticResource I.close}" Content="Deny" Command="{Binding DenyCommand}" Margin="0,0,5,5"/>
+                                        <Button Style="{StaticResource Btn}" Tag="{StaticResource I.terminal}" Content="Terminal" ToolTip="Let the terminal prompt decide" Command="{Binding TerminalCommand}" Margin="0,0,5,5"/>
+                                    </WrapPanel>
+                                    <Grid Margin="0,2,0,0">
+                                        <TextBox Text="{Binding DenyReason, UpdateSourceTrigger=PropertyChanged}"/>
+                                        <TextBlock Text="Deny reason (optional)" Foreground="{StaticResource Faint}" Margin="8,4,0,0" IsHitTestVisible="False"
+                                                   Visibility="{Binding DenyReason, Converter={StaticResource EmptyVis}}"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                            <TextBlock Text="{Binding MoreApprovals}" Foreground="#F5A524" Margin="0,4,0,0" FontSize="11"
+                                       Visibility="{Binding MoreApprovals, Converter={StaticResource NotNull}}"/>
+                        </StackPanel>
                     </StackPanel>
                 </Grid>
             </Border>
         </DataTemplate>
     </Window.Resources>
 
-    <Border BorderBrush="#33353C" BorderThickness="1" CornerRadius="0">
+    <Border BorderBrush="#26282E" BorderThickness="1" CornerRadius="0">
         <Grid>
             <!-- Pill -->
             <Border Visibility="{Binding IsPill, Converter={StaticResource Vis}}" Padding="12,8" Background="Transparent"
                     MouseLeftButtonDown="Header_MouseDown" ToolTip="Click to expand">
                 <StackPanel Orientation="Horizontal">
-                    <Ellipse Width="10" Height="10" Fill="{Binding PillBrush}" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding PillText}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                    <Ellipse Width="9" Height="9" Fill="{Binding PillBrush}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding PillText}" Margin="8,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold"/>
                 </StackPanel>
             </Border>
 
             <!-- Expanded / compact -->
             <StackPanel Width="320" Visibility="{Binding IsPill, Converter={StaticResource InvVis}}" Margin="8">
-                <DockPanel Margin="2,0,0,6" Background="Transparent" MouseLeftButtonDown="Header_MouseDown" Cursor="SizeAll">
-                    <Button DockPanel.Dock="Right" Style="{StaticResource Icon}" Content="&#xE8A9;" ToolTip="Cycle mode (Ctrl+Alt+Shift+D)" Command="{Binding CycleModeCommand}"/>
-                    <Border DockPanel.Dock="Right" Background="Transparent" Padding="5,0" Margin="2,0,0,0" Cursor="Cross"
+                <DockPanel Margin="4,0,0,7" Background="Transparent" MouseLeftButtonDown="Header_MouseDown" Cursor="SizeAll">
+                    <Button DockPanel.Dock="Right" Style="{StaticResource Icon}" Tag="{StaticResource I.layout}" ToolTip="Cycle mode (Ctrl+Alt+Shift+D)" Command="{Binding CycleModeCommand}"/>
+                    <Border DockPanel.Dock="Right" Background="Transparent" Padding="5" CornerRadius="6" Margin="1,0,0,0" Cursor="Cross"
                             ToolTip="Drag onto any window to watch it (or drop a shortcut / .exe here)"
                             PreviewMouseLeftButtonDown="Picker_Down" MouseMove="Picker_Move" PreviewMouseLeftButtonUp="Picker_Up">
-                        <TextBlock Text="⌖" FontFamily="Segoe UI Symbol" FontSize="15" Foreground="#9EA1AA" VerticalAlignment="Center"/>
+                        <Viewbox Width="14" Height="14">
+                            <Grid Width="24" Height="24"><Path Style="{StaticResource Stroke}" Data="{StaticResource I.target}" Stroke="{StaticResource Muted}"/></Grid>
+                        </Viewbox>
                     </Border>
-                    <Button DockPanel.Dock="Right" Style="{StaticResource Btn}" Padding="7,1" Command="{Binding ToggleDetectedCommand}"
+                    <Button DockPanel.Dock="Right" Style="{StaticResource Btn}" Padding="8,2" Margin="0,0,3,0" Command="{Binding ToggleDetectedCommand}"
                             ToolTip="Detected sources" Visibility="{Binding DetectedCount, Converter={StaticResource NotZero}}">
-                        <TextBlock><Run Text="+"/><Run Text="{Binding DetectedCount, Mode=OneWay}"/><Run Text=" detected"/></TextBlock>
+                        <TextBlock FontSize="11"><Run Text="+"/><Run Text="{Binding DetectedCount, Mode=OneWay}"/><Run Text=" detected"/></TextBlock>
                     </Button>
+                    <Ellipse Width="8" Height="8" Fill="{Binding PillBrush}" Margin="0,0,7,0" VerticalAlignment="Center"/>
                     <TextBlock Text="TaskDock" Foreground="{StaticResource Muted}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                 </DockPanel>
 
-                <ItemsControl ItemsSource="{Binding Detected}" Visibility="{Binding ShowDetected, Converter={StaticResource Vis}}" Margin="0,0,0,6">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="{x:Type local:TileViewModel}">
-                            <DockPanel Margin="4,2">
-                                <Button DockPanel.Dock="Right" Style="{StaticResource Btn}" Content="Pin" Command="{Binding PinCommand}"/>
-                                <Ellipse Width="8" Height="8" Fill="{Binding ClassBrush}" Margin="0,0,8,0"/>
-                                <Grid DockPanel.Dock="Left" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center">
-                                <Image Source="{Binding AppIcon}" RenderOptions.BitmapScalingMode="HighQuality"/>
-                                <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="11" Foreground="{StaticResource Muted}"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding AppIcon, Converter={StaticResource NullVis}}"/>
-                            </Grid>
-                                <TextBlock VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
-                                    <Run Text="{Binding Label, Mode=OneWay}" FontWeight="SemiBold"/><Run Text="  "/><Run Text="{Binding StateText, Mode=OneWay}" Foreground="{StaticResource Muted}"/>
-                                </TextBlock>
-                            </DockPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <Border Visibility="{Binding ShowDetected, Converter={StaticResource Vis}}" Margin="0,0,0,7" Padding="4" CornerRadius="10" Background="{StaticResource TileBg}" BorderBrush="#22242A" BorderThickness="1">
+                    <ItemsControl ItemsSource="{Binding Detected}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type local:TileViewModel}">
+                                <DockPanel Margin="4,3">
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource Btn}" Tag="{StaticResource I.pin}" Content="Pin" Padding="8,2" Margin="0" Command="{Binding PinCommand}"/>
+                                    <Ellipse Width="7" Height="7" Fill="{Binding ClassBrush}" Margin="2,0,8,0"/>
+                                    <Grid DockPanel.Dock="Left" Width="14" Height="14" Margin="0,0,7,0" VerticalAlignment="Center">
+                                        <Image Source="{Binding AppIcon}" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                        <Viewbox Visibility="{Binding AppIcon, Converter={StaticResource NullVis}}">
+                                            <Grid Width="24" Height="24"><Path Style="{StaticResource Stroke}" Data="{Binding Glyph, Converter={StaticResource IconRes}}" Stroke="{StaticResource Muted}"/></Grid>
+                                        </Viewbox>
+                                    </Grid>
+                                    <TextBlock VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+                                        <Run Text="{Binding Label, Mode=OneWay}" FontWeight="SemiBold"/><Run Text="  "/><Run Text="{Binding StateText, Mode=OneWay}" Foreground="{StaticResource Muted}"/>
+                                    </TextBlock>
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
 
                 <ItemsControl ItemsSource="{Binding Tiles}" ItemTemplate="{StaticResource TileTemplate}"/>
 
                 <!-- Media bar: whatever Windows' media controls say is playing. -->
-                <Border Margin="0,2,0,0" Padding="8,7" CornerRadius="8" Background="{StaticResource TileBg}" DataContext="{Binding Media}"
+                <Border Margin="0,1,0,0" Padding="8" CornerRadius="10" Background="{StaticResource TileBg}" BorderBrush="#22242A" BorderThickness="1" DataContext="{Binding Media}"
                         Visibility="{Binding HasSession, Converter={StaticResource Vis}, FallbackValue=Collapsed}">
                     <StackPanel>
                         <DockPanel>
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Style="{StaticResource Icon}" Content="&#xE892;" ToolTip="Previous" Command="{Binding PreviousCommand}" IsEnabled="{Binding CanPrevious}" FontSize="13"/>
-                                <Button Style="{StaticResource Icon}" Content="{Binding PlayGlyph}" ToolTip="Play / pause" Command="{Binding TogglePlayCommand}" IsEnabled="{Binding CanToggle}" FontSize="15" Foreground="#ECEDEE"/>
-                                <Button Style="{StaticResource Icon}" Content="&#xE893;" ToolTip="Next" Command="{Binding NextCommand}" IsEnabled="{Binding CanNext}" FontSize="13"/>
-                                <Button Style="{StaticResource Icon}" Content="&#xE70E;" ToolTip="Fold / unfold" Command="{Binding ToggleCollapsedCommand}"/>
+                                <Button Style="{StaticResource Icon}" Tag="{StaticResource I.prev}" ToolTip="Previous" Command="{Binding PreviousCommand}" IsEnabled="{Binding CanPrevious}"/>
+                                <Button ToolTip="Play / pause" Command="{Binding TogglePlayCommand}" IsEnabled="{Binding CanToggle}" FontSize="15" Foreground="#ECEDEE">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource Icon}">
+                                            <Setter Property="Tag" Value="{StaticResource I.play}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Playing}" Value="True"><Setter Property="Tag" Value="{StaticResource I.pause}"/></DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                                <Button Style="{StaticResource Icon}" Tag="{StaticResource I.next}" ToolTip="Next" Command="{Binding NextCommand}" IsEnabled="{Binding CanNext}"/>
+                                <Button ToolTip="Fold / unfold" Command="{Binding ToggleCollapsedCommand}">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource Icon}">
+                                            <Setter Property="Tag" Value="{StaticResource I.chevronUp}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Collapsed}" Value="False"><Setter Property="Tag" Value="{StaticResource I.chevronDown}"/></DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
                             </StackPanel>
-                            <Border Width="34" Height="34" CornerRadius="4" Margin="0,0,8,0" ClipToBounds="True" Visibility="{Binding Thumb, Converter={StaticResource NotNull}}">
+                            <Border Width="34" Height="34" CornerRadius="7" Margin="0,0,9,0" ClipToBounds="True" Visibility="{Binding Thumb, Converter={StaticResource NotNull}}">
                                 <Border.Background><ImageBrush ImageSource="{Binding Thumb}" Stretch="UniformToFill"/></Border.Background>
                             </Border>
                             <StackPanel VerticalAlignment="Center">
@@ -251,29 +362,32 @@
                                 </DockPanel>
                             </StackPanel>
                         </DockPanel>
-                        <ProgressBar Height="2" Margin="0,6,0,0" Minimum="0" Maximum="1" Value="{Binding Progress}" Foreground="#8B8D98"
-                                     Background="#33353C" BorderThickness="0" Visibility="{Binding HasProgress, Converter={StaticResource Vis}}"/>
+                        <ProgressBar Height="2" Margin="0,7,0,0" Minimum="0" Maximum="1" Value="{Binding Progress}" Foreground="#8B8D98"
+                                     Background="{StaticResource Raised}" BorderThickness="0" Visibility="{Binding HasProgress, Converter={StaticResource Vis}}"/>
                         <StackPanel Visibility="{Binding Collapsed, Converter={StaticResource InvVis}}">
-                            <DockPanel Margin="0,6,0,0" Visibility="{Binding ShowChips, Converter={StaticResource Vis}}">
-                                <Button DockPanel.Dock="Right" Style="{StaticResource Icon}" Content="&#xE718;" Command="{Binding TogglePinCommand}"
+                            <DockPanel Margin="0,7,0,0" Visibility="{Binding ShowChips, Converter={StaticResource Vis}}">
+                                <Button DockPanel.Dock="Right" Style="{StaticResource Icon}" Tag="{StaticResource I.pin}" Command="{Binding TogglePinCommand}"
                                         ToolTip="Stick to this app" Foreground="{Binding IsPinned, Converter={StaticResource PinColor}}"/>
                                 <ItemsControl ItemsSource="{Binding Apps}">
                                     <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Button Style="{StaticResource Btn}" Padding="7,1" Margin="0,0,4,0" Content="{Binding Name}"
+                                            <Button Style="{StaticResource Btn}" Padding="8,2" Margin="0,0,5,0" Content="{Binding Name}"
                                                     Command="{Binding DataContext.SelectCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding AppId}"
                                                     Background="{Binding Selected, Converter={StaticResource ChipBg}}"/>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </DockPanel>
-                            <DockPanel Margin="0,6,0,0">
-                                <Button DockPanel.Dock="Right" Style="{StaticResource Btn}" Content="YouTube" Margin="4,0,0,0" Command="{Binding SearchYouTubeCommand}"/>
-                                <Button DockPanel.Dock="Right" Style="{StaticResource Btn}" Content="Spotify" Margin="4,0,0,0" Command="{Binding SearchSpotifyCommand}"/>
+                            <DockPanel Margin="0,7,0,0">
+                                <Button DockPanel.Dock="Right" Style="{StaticResource Btn}" Content="YouTube" Margin="5,0,0,0" Command="{Binding SearchYouTubeCommand}"/>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource Btn}" Content="Spotify" Margin="5,0,0,0" Command="{Binding SearchSpotifyCommand}"/>
                                 <Grid>
-                                    <TextBox Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}" KeyDown="MediaSearch_KeyDown"/>
-                                    <TextBlock Text="Search music…" Foreground="#5C5F69" Margin="6,2,0,0" IsHitTestVisible="False"
+                                    <TextBox Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}" KeyDown="MediaSearch_KeyDown" Padding="24,3,6,3"/>
+                                    <Viewbox Width="12" Height="12" HorizontalAlignment="Left" Margin="8,0,0,0" IsHitTestVisible="False">
+                                        <Grid Width="24" Height="24"><Path Style="{StaticResource Stroke}" Data="{StaticResource I.search}" Stroke="{StaticResource Faint}"/></Grid>
+                                    </Viewbox>
+                                    <TextBlock Text="Search music…" Foreground="{StaticResource Faint}" Margin="26,4,0,0" IsHitTestVisible="False"
                                                Visibility="{Binding Query, Converter={StaticResource EmptyVis}}"/>
                                 </Grid>
                             </DockPanel>
@@ -282,7 +396,7 @@
                 </Border>
 
                 <TextBlock Visibility="{Binding IsEmpty, Converter={StaticResource Vis}}" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="4,2,4,4"
-                           Text="Nothing pinned yet. Sources show up under “detected” when they connect. Drag ⌖ onto any window, or drop a shortcut here, to watch it. For Claude Code: tray icon → Connect Claude Code."/>
+                           Text="Nothing pinned yet. Sources show up under “detected” when they connect. Drag the target icon onto any window, or drop a shortcut here, to watch it. For Claude Code: tray icon → Connect Claude Code."/>
             </StackPanel>
         </Grid>
     </Border>
